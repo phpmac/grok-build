@@ -186,8 +186,8 @@ pub struct PromptStyle {
     /// `true` (the full-TUI boxed prompt); minimal mode sets it `false` for a
     /// cleaner, border-less input that still keeps the chrome padding.
     pub show_borders: bool,
-    /// Session title inlined in the top border (right-aligned, 2-cell inset),
-    /// styled like the bottom info line's model name.
+    /// Session title inlined in the top border (left-aligned, 2-cell inset
+    /// after ╭), styled like the bottom info line's model name.
     /// None (default) keeps the plain border. Set only by the agent view.
     pub title: Option<String>,
     /// Paint image-chip overlay into `overlay_area` (default true).
@@ -2921,8 +2921,8 @@ impl PromptWidget {
                 }
             }
 
-            // Session title inlined in the divider (` title `, right-aligned
-            // ending 2 cells before ╮) in the shared chrome-caption style;
+            // Session title inlined in the divider (` title `, left-aligned
+            // starting 2 cells after ╭) in the shared chrome-caption style;
             // the pad spaces blank the adjacent `─`.
             if let Some(title) = style
                 .title
@@ -2935,8 +2935,8 @@ impl PromptWidget {
                 if max_w >= 6 {
                     let label = format!(" {title} ");
                     let trunc = crate::render::line_utils::truncate_str(&label, max_w as usize);
-                    let label_w = unicode_width::UnicodeWidthStr::width(trunc.as_str()) as u16;
-                    let x = area.x + area.width.saturating_sub(3 + label_w);
+                    // Left-aligned: after ╭ and a 2-cell inset.
+                    let x = area.x + 3;
                     buf.set_string(
                         x,
                         div_y,
@@ -3287,8 +3287,8 @@ impl PromptWidget {
     }
 
     /// Caption style for text embedded in the prompt's border chrome — the
-    /// info line's model name on `╰─╯` and the session title on `╭─╮`:
-    /// dimmed secondary text over the prompt bg, fading further when
+    /// info line's model name on `╰─╯` and the left-aligned session title on
+    /// `╭─╮`: dimmed secondary text over the prompt bg, fading further when
     /// unfocused, so both borders read as one chrome.
     fn chrome_caption_style(bg: ratatui::style::Color, theme: &Theme, focused: bool) -> Style {
         let opacity = if focused { 0.6 } else { 0.4 };

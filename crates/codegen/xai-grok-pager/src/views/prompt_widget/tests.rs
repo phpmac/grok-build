@@ -4512,12 +4512,12 @@
     fn title_renders_on_top_border_with_corners_intact() {
         let buf = draw_bordered(40, &title_test_style(Some("my session")));
 
-        // ` my session ` is 12 cols, right-aligned ending 2 cells before ╮:
-        // label at x 25..=36, dashes at 37..=38, corner at 39.
-        assert_eq!(buf_text_at(&buf, 25, 37, 0), " my session ");
+        // ` my session ` is 12 cols, left-aligned starting 2 cells after ╭:
+        // dashes at 1..=2, label at x 3..=14, corner at 0 / 39.
+        assert_eq!(buf_text_at(&buf, 1, 3, 0), "\u{2500}\u{2500}");
+        assert_eq!(buf_text_at(&buf, 3, 15, 0), " my session ");
         assert_eq!(buf.cell((0, 0)).unwrap().symbol(), "\u{256d}");
         assert_eq!(buf.cell((39, 0)).unwrap().symbol(), "\u{256e}");
-        assert_eq!(buf_text_at(&buf, 37, 39, 0), "\u{2500}\u{2500}");
 
         // Info-line treatment: dimmed secondary text on the prompt bg (same
         // blend as `render_info_line`'s model name), no bold, no inverse.
@@ -4525,7 +4525,7 @@
         let expected_fg =
             crate::render::color::blend_color(theme.bg_base, theme.text_secondary, 0.6)
                 .unwrap_or(theme.gray);
-        let title_cell = buf.cell((26, 0)).unwrap().style();
+        let title_cell = buf.cell((4, 0)).unwrap().style();
         assert_eq!(title_cell.fg, Some(expected_fg));
         assert_eq!(title_cell.bg, Some(theme.bg_base));
         assert!(!title_cell.add_modifier.contains(Modifier::BOLD));
