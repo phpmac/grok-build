@@ -1,5 +1,5 @@
 //! Telemetry engine for Grok Build sessions: product events + Mixpanel emission +
-//! Sentry error reporting + OpenTelemetry tracing + structured unified log.
+//! OpenTelemetry tracing + structured unified log.
 //!
 //! Extracted from `xai-file-utils` per review feedback so telemetry has
 //! its own ownership boundary (see CODEOWNERS) and so downstream consumers
@@ -25,7 +25,6 @@ pub(crate) mod otlp_http;
 pub mod prompt_timing;
 pub(crate) mod redact_common;
 pub mod sampling_log;
-pub mod sentry;
 pub mod session_ctx;
 pub mod session_metrics;
 pub mod unified_log;
