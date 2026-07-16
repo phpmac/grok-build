@@ -23,3 +23,9 @@
 - 配置与数据默认在 `~/.grok/`
 - 根 `Cargo.toml` 多为生成物, 改依赖优先改各 crate 的 `Cargo.toml`
 
+## 发版约定
+
+- Release 正文只写本次变更说明, 禁止列 assets 产物清单 (CI 上传什么用户自己看得到, 列出来是废话)
+- Release 不生成/不上传 `*.sha256` 校验文件, 多余
+- tag `v*` 推送后由 CI 构建多平台二进制并自动上传 tar.gz 到 Release
+

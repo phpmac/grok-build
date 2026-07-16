@@ -78,8 +78,7 @@ jobs:
           cp "$bin" "$dist/grok"
           chmod +x "$dist/grok"
           tar -czf "${dist}.tar.gz" "$dist"
-          shasum -a 256 "${dist}.tar.gz" > "${dist}.tar.gz.sha256"
-          ls -la "${dist}.tar.gz"*
+          ls -la "${dist}.tar.gz"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -87,7 +86,6 @@ jobs:
           name: grok-${{ matrix.target }}
           path: |
             grok-${{ matrix.target }}.tar.gz
-            grok-${{ matrix.target }}.tar.gz.sha256
           if-no-files-found: error
 
   release:
@@ -108,7 +106,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
-          mapfile -t files < <(find artifacts -type f \( -name 'grok-*.tar.gz' -o -name 'grok-*.tar.gz.sha256' \) | sort)
+          mapfile -t files < <(find artifacts -type f -name 'grok-*.tar.gz' | sort)
           test "${#files[@]}" -gt 0
 
           # notes 由发版流程事先写好; 此处仅上传产物, 不覆盖已有说明.
