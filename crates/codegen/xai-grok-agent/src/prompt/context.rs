@@ -148,6 +148,11 @@ pub struct PromptContext {
     /// Not the UI picker name. Defaults to [`DEFAULT_SYSTEM_PROMPT_LABEL`].
     #[serde(default = "default_system_prompt_label")]
     pub system_prompt_label: String,
+    /// Preferred language for communication and generated text (titles,
+    /// commits, PR descriptions). When set, the system prompt includes a
+    /// language instruction block. Unset = no language instruction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
 }
 /// Default identity on trim-tool-descriptions (`You are Grok released by xAI`).
 pub const DEFAULT_SYSTEM_PROMPT_LABEL: &str = "Grok";
@@ -192,6 +197,7 @@ impl Default for PromptContext {
             current_date: None,
             is_non_interactive: false,
             system_prompt_label: default_system_prompt_label(),
+            language: None,
         }
     }
 }
@@ -245,7 +251,8 @@ impl PromptContext {
             .unwrap_or(""), "working_directory" : self.working_directory.as_deref()
             .unwrap_or(""), "current_date" : self.current_date.as_deref().unwrap_or(""),
             "is_non_interactive" : self.is_non_interactive, "system_prompt_label" : self
-            .system_prompt_label.as_str(), }
+            .system_prompt_label.as_str(), "language" : self.language.as_deref()
+            .unwrap_or(""), }
         )
     }
     /// Render the full system prompt via `ToolBridge`.
@@ -322,6 +329,7 @@ mod tests {
             current_date: None,
             is_non_interactive: false,
             system_prompt_label: default_system_prompt_label(),
+            language: None,
         }
     }
     #[test]
@@ -430,6 +438,31 @@ mod tests {
         ctx.system_prompt_label = "Grok Internal".into();
         let p = ctx.placeholders();
         assert_eq!(p["system_prompt_label"], "Grok Internal");
+    }
+
+    #[test]
+    fn test_placeholders_language_defaults_empty() {
+        let ctx = test_context();
+        let p = ctx.placeholders();
+        assert_eq!(p["language"], "");
+    }
+
+    #[test]
+    fn test_placeholders_language_simplified_chinese() {
+        let mut ctx = test_context();
+        ctx.language = Some("简体中文".into());
+        let p = ctx.placeholders();
+        assert_eq!(p["language"], "简体中文");
+    }
+
+    #[test]
+    fn language_field_round_trips_in_json() {
+        let mut ctx = test_context();
+        ctx.language = Some("简体中文".into());
+        let json = serde_json::to_string(&ctx).unwrap();
+        assert!(json.contains("简体中文"));
+        let loaded: PromptContext = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.language.as_deref(), Some("简体中文"));
     }
     #[test]
     fn test_missing_system_prompt_label_deserializes_to_default() {
@@ -607,6 +640,7 @@ mod tests {
             current_date: None,
             is_non_interactive: false,
             system_prompt_label: default_system_prompt_label(),
+            language: None,
         }
     }
     #[test]

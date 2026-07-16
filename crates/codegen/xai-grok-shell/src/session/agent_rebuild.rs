@@ -129,6 +129,8 @@ pub(crate) struct AgentRebuildSpec {
         Option<xai_grok_tools::types::resources::ManagedGatewayToolClient>,
     pub is_non_interactive: bool,
     pub system_prompt_label: String,
+    /// Preferred communication language from `[ui].language` / `GROK_LANGUAGE`.
+    pub language: Option<String>,
     pub owner_session_id: Option<String>,
     pub parent_scheduler_handle:
         Option<xai_grok_tools::implementations::grok_build::scheduler::types::SchedulerHandle>,
@@ -222,6 +224,7 @@ impl AgentRebuildSpec {
             managed_gateway_tool_client,
             is_non_interactive,
             system_prompt_label,
+            language,
             owner_session_id,
             parent_scheduler_handle,
         } = self.as_ref();
@@ -241,6 +244,7 @@ impl AgentRebuildSpec {
         .with_memory_paths(memory_global_path.clone(), memory_workspace_path.clone())
         .with_is_non_interactive(*is_non_interactive)
         .with_system_prompt_label(system_prompt_label.clone())
+        .with_language(language.clone())
         .with_session_env(session_env.clone())
         .with_state_path(bridge_state_path.clone())
         .with_web_search_config(web_search_config.clone())
@@ -426,6 +430,7 @@ pub(crate) fn test_rebuild_spec_default() -> Arc<AgentRebuildSpec> {
         managed_gateway_tool_client: None,
         is_non_interactive: false,
         system_prompt_label: xai_grok_agent::DEFAULT_SYSTEM_PROMPT_LABEL.to_string(),
+        language: None,
         owner_session_id: Some("test-session".to_string()),
         parent_scheduler_handle: None,
     })

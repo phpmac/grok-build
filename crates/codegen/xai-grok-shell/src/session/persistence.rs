@@ -2103,6 +2103,9 @@ pub(crate) async fn new(
                 crate::session::summary::SummaryConfig {
                     sampling_client,
                     model: session_summary_model,
+                    language: crate::util::config::resolve_language(
+                        &crate::util::config::load_config().await,
+                    ),
                     persistence_tx: tx,
                 },
             ),
@@ -2173,6 +2176,9 @@ pub async fn new_with_explicit_dir(
                 crate::session::summary::SummaryConfig {
                     sampling_client,
                     model: session_summary_model,
+                    language: crate::util::config::resolve_language(
+                        &crate::util::config::load_config().await,
+                    ),
                     persistence_tx: tx,
                 },
             ),
@@ -2281,6 +2287,9 @@ pub(crate) async fn load(
             crate::session::summary::SummaryConfig {
                 sampling_client,
                 model: session_summary_model,
+                language: crate::util::config::resolve_language(
+                    &crate::util::config::load_config().await,
+                ),
                 persistence_tx: tx,
             },
         );
@@ -2366,6 +2375,9 @@ pub(crate) async fn load_light(
             crate::session::summary::SummaryConfig {
                 sampling_client,
                 model: session_summary_model,
+                language: crate::util::config::resolve_language(
+                    &crate::util::config::load_config().await,
+                ),
                 persistence_tx: tx,
             },
         );

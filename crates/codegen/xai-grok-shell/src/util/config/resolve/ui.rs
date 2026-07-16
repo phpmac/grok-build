@@ -1,6 +1,59 @@
 use crate::util::config::RemoteSettings;
 use toml::Value as TomlValue;
 
+/// Env override for preferred communication language.
+pub const ENV_LANGUAGE: &str = "GROK_LANGUAGE";
+
+/// Resolve preferred communication / generated-text language.
+///
+/// Precedence: env `GROK_LANGUAGE` → `[ui].language` on the given config.
+/// Empty/whitespace is treated as unset. No built-in default language.
+///
+/// Accepts the util-layer `Config` returned by [`crate::util::config::load_config`].
+pub fn resolve_language(cfg: &crate::util::config::Config) -> Option<String> {
+    let from_env = std::env::var(ENV_LANGUAGE).ok();
+    normalize_language(from_env.as_deref()).or_else(|| normalize_language(cfg.ui.language.as_deref()))
+}
+
+/// Trim and drop empty language values.
+pub fn normalize_language(raw: Option<&str>) -> Option<String> {
+    raw.map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
+
+#[cfg(test)]
+mod language_tests {
+    use super::{normalize_language, resolve_language};
+
+    #[test]
+    fn normalize_accepts_simplified_chinese_display_name() {
+        assert_eq!(
+            normalize_language(Some("简体中文")).as_deref(),
+            Some("简体中文")
+        );
+        assert_eq!(
+            normalize_language(Some("  简体中文  ")).as_deref(),
+            Some("简体中文")
+        );
+    }
+
+    #[test]
+    fn normalize_rejects_empty_and_whitespace() {
+        assert_eq!(normalize_language(None), None);
+        assert_eq!(normalize_language(Some("")), None);
+        assert_eq!(normalize_language(Some("   ")), None);
+    }
+
+    #[test]
+    fn resolve_language_reads_ui_config() {
+        let mut cfg = crate::util::config::Config::default();
+        assert_eq!(resolve_language(&cfg), None);
+        cfg.ui.language = Some("简体中文".into());
+        assert_eq!(resolve_language(&cfg).as_deref(), Some("简体中文"));
+    }
+}
+
 /// Env override for showing agent thinking blocks in the TUI.
 pub const ENV_SHOW_THINKING_BLOCKS: &str = "GROK_SHOW_THINKING_BLOCKS";
 

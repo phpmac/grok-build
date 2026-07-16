@@ -280,3 +280,18 @@ pub async fn set_show_tips(value: bool) -> Result<()> {
 pub async fn set_auto_update(value: bool) -> Result<()> {
     update_config(|cfg| cfg.cli.auto_update = Some(value)).await
 }
+
+/// Persist `[ui].language` via `update_config`. Empty clears the key.
+pub async fn set_language(value: String) -> Result<()> {
+    update_config(|cfg| {
+        cfg.ui.language = {
+            let t = value.trim();
+            if t.is_empty() {
+                None
+            } else {
+                Some(t.to_string())
+            }
+        };
+    })
+    .await
+}

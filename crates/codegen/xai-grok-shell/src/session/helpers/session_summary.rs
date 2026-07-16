@@ -71,23 +71,46 @@ pub(crate) fn title_fallback_from_user_text(user_message: &str) -> String {
 /// We do not generate more of it on next user message unless its very important
 ///
 /// Ideally we should be updating it as the session continues, but ... skipping that for now
+///
+/// `language` is the preferred output language (from `[ui].language` /
+/// `GROK_LANGUAGE`). When set, the title is generated in that language.
 pub async fn generate_session_summary(
     user_message: String,
     client: OaiCompatClient,
     model: &str,
+    language: Option<&str>,
 ) -> String {
     let clean_message = title_source_text(&user_message);
-    let request = ConversationRequest::from_items(vec![
-        ConversationItem::system(
-            r#"You are tasked with generating the session title. The user is asking almost always software engineering related questions on their codebase.
+    let language_instruction = language
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|lang| {
+            format!(
+                "\n\nWrite the session_title in {lang}. Use natural phrasing in that language; do not translate code identifiers."
+            )
+        })
+        .unwrap_or_default();
+    let system = format!(
+        r#"You are tasked with generating the session title. The user is asking almost always software engineering related questions on their codebase.
 We describe the session title below
 # Session Title
 A short and distinctive 5-10 word descriptive title for the session. Super info dense, no filler.
-
+{language_instruction}
 You will be given the user query below encapsulated in <user_query></user_query>.
 
-Just generate the session_title and nothing else"#,
+Just generate the session_title and nothing else"#
+    );
+    let title_desc = match language.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(lang) => format!(
+            "Final session title in {lang}, just 5-10 word descriptive title for the session. Super info dense, no filler."
         ),
+        None => {
+            "Final session title, just 5-10 word descriptive title for the session. Super info dense, no filler."
+                .to_string()
+        }
+    };
+    let request = ConversationRequest::from_items(vec![
+        ConversationItem::system(system),
         ConversationItem::user(format!(
             r#"<user_query>
 {}
@@ -105,7 +128,7 @@ Just generate the session_title and nothing else"#,
             "properties": {
                 "session_title": {
                     "type": "string",
-                    "description": "Final session title, just 5-10 word descriptive title for the session. Super info dense, no filler."
+                    "description": title_desc
                 }
             },
             "additionalProperties": false

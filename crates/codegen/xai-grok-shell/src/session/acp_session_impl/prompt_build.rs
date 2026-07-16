@@ -343,6 +343,10 @@ impl SessionActor {
             .map(|s| s.as_str())
             .unwrap_or(&self.session_info.cwd);
         let cwd = std::path::Path::new(display_path);
+        let language = {
+            let cfg = crate::util::config::load_config().await;
+            crate::util::config::resolve_language(&cfg)
+        };
         use xai_grok_agent::prompt::user_message::UserMessageTemplate;
         let template = self
             .agent
@@ -362,15 +366,16 @@ impl SessionActor {
                     "templated user message render failed; falling back to legacy prefix"
                 );
                 if self.startup_hints.skip_git_status {
-                    construct_user_message_minimal(cwd, None)
+                    construct_user_message_minimal(cwd, None, language.as_deref())
                 } else {
-                    construct_user_message(cwd, self.vcs_kind, None, None).await
+                    construct_user_message(cwd, self.vcs_kind, None, None, language.as_deref())
+                        .await
                 }
             }
         } else if self.startup_hints.skip_git_status {
-            construct_user_message_minimal(cwd, None)
+            construct_user_message_minimal(cwd, None, language.as_deref())
         } else {
-            construct_user_message(cwd, self.vcs_kind, None, None).await
+            construct_user_message(cwd, self.vcs_kind, None, None, language.as_deref()).await
         };
         self.last_announced_local_date
             .set(chrono::Local::now().date_naive());

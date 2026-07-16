@@ -26,6 +26,8 @@ enum State {
 pub(crate) struct SummaryConfig {
     pub(crate) sampling_client: OaiCompatClient,
     pub(crate) model: String,
+    /// Preferred title language from `[ui].language` / `GROK_LANGUAGE`.
+    pub(crate) language: Option<String>,
     /// Channel back to the persistence actor for sequential storage writes.
     pub(crate) persistence_tx: mpsc::UnboundedSender<PersistenceMsg>,
 }
@@ -71,14 +73,20 @@ impl SummaryGenerator {
 
                 let sampling_client = self.config.sampling_client.clone();
                 let model = self.config.model.clone();
+                let language = self.config.language.clone();
                 let persistence_tx = self.config.persistence_tx.clone();
 
                 // Spawn title generation as a background task so the
                 // persistence actor can continue processing messages
                 // (updates, flushes) without waiting for the LLM call.
                 tokio::spawn(async move {
-                    let mut title =
-                        generate_session_summary(content.clone(), sampling_client, &model).await;
+                    let mut title = generate_session_summary(
+                        content.clone(),
+                        sampling_client,
+                        &model,
+                        language.as_deref(),
+                    )
+                    .await;
                     if title.trim().is_empty() {
                         title =
                             crate::session::helpers::session_summary::title_fallback_from_user_text(

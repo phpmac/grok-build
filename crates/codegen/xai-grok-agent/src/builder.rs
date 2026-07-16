@@ -83,6 +83,8 @@ pub struct AgentBuilder {
     memory_workspace_path: Option<String>,
     is_non_interactive: bool,
     system_prompt_label: String,
+    /// Preferred communication language; injected into the system prompt.
+    language: Option<String>,
     session_env: Option<Arc<HashMap<String, String>>>,
     state_path: Option<PathBuf>,
     memory_backend: Option<Arc<dyn xai_grok_tools::types::memory_backend::MemoryBackend>>,
@@ -211,6 +213,7 @@ impl AgentBuilder {
             memory_workspace_path: None,
             is_non_interactive: false,
             system_prompt_label: crate::prompt::context::DEFAULT_SYSTEM_PROMPT_LABEL.to_string(),
+            language: None,
             session_env: None,
             state_path: None,
             memory_backend: None,
@@ -352,6 +355,15 @@ impl AgentBuilder {
     }
     pub fn with_system_prompt_label(mut self, label: impl Into<String>) -> Self {
         self.system_prompt_label = label.into();
+        self
+    }
+    /// Preferred language for replies, titles, commits, and PR text.
+    /// Empty/None leaves no language instruction in the system prompt.
+    pub fn with_language(mut self, language: Option<String>) -> Self {
+        self.language = language.and_then(|s| {
+            let t = s.trim();
+            (!t.is_empty()).then(|| t.to_string())
+        });
         self
     }
     pub fn with_reminder_policy(mut self, policy: ReminderPolicy) -> Self {
@@ -1159,6 +1171,7 @@ impl AgentBuilder {
             ),
             is_non_interactive: self.is_non_interactive,
             system_prompt_label: self.system_prompt_label,
+            language: self.language,
         };
         let system_prompt = prompt_context
             .render(&tool_bridge)

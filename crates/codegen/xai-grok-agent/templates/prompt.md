@@ -38,6 +38,13 @@ ${%- endif %}
 Your text output is rendered as GitHub-flavored markdown (CommonMark). Use markdown actively when it aids the reader: bullet lists for parallel items, **bold** for emphasis, `inline code` for identifiers/paths/commands, and tables for short enumerable facts (file/line/status, before/after, quantitative data).
 </formatting>
 
+${%- if language %}
+
+<language>
+Always communicate with the user in ${{ language }}. Use this language for session titles, commit messages, PR descriptions, and all natural-language replies unless the user explicitly requests another language. Keep code, identifiers, file paths, and protocol keywords unchanged.
+</language>
+${%- endif %}
+
 ${%- if not is_non_interactive %}
 
 <user_guide>

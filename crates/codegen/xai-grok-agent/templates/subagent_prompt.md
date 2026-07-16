@@ -65,6 +65,12 @@ Shell: ${{ shell_path }}
 Workspace Path: ${{ working_directory }}
 Current Date: ${{ current_date }}
 </user_info>
+${%- if language %}
+
+<language>
+Always communicate with the user in ${{ language }}. Use this language for session titles, commit messages, PR descriptions, and all natural-language replies unless the user explicitly requests another language. Keep code, identifiers, file paths, and protocol keywords unchanged.
+</language>
+${%- endif %}
 ${%- if memory_enabled and tools.by_kind.memory_search and tools.by_kind.memory_get %}
 
 <memory>

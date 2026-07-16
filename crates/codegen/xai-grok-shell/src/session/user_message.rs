@@ -30,9 +30,14 @@ pub struct UserInfoOverride {
 /// Intentionally excludes workspace snapshot and git status.
 /// When `override_info` is provided, uses remote workspace info instead
 /// of local machine introspection.
+///
+/// `language` is the preferred communication language (from `[ui].language` /
+/// `GROK_LANGUAGE`). When `Some`, a language line is included so the model
+/// uses it for replies, titles, commits, and PR text.
 pub fn construct_user_message_minimal(
     working_directory: &Path,
     override_info: Option<&UserInfoOverride>,
+    language: Option<&str>,
 ) -> String {
     let local_shell;
     let (os, shell, cwd) = match override_info {
@@ -50,12 +55,21 @@ pub fn construct_user_message_minimal(
     // compaction and on resume (build_user_message_prefix), so it stays current
     // across long sessions.
     let today = chrono::Local::now().format("%Y-%m-%d");
+    let language_line = language
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|lang| {
+            format!(
+                "\nPreferred language: {lang}\nAlways communicate with the user in this language. Use it for session titles, commit messages, PR descriptions, and all natural-language replies unless the user explicitly requests another language. Keep code, identifiers, file paths, and protocol keywords unchanged."
+            )
+        })
+        .unwrap_or_default();
     format!(
         r#"<user_info>
 OS Version: {os}
 Shell: {shell}
 Workspace Path: {cwd}
-Today's date: {today}
+Today's date: {today}{language_line}
 Note: Prefer using relative paths over absolute paths as tool call args when possible.
 </user_info>"#,
     )
@@ -134,11 +148,15 @@ pub async fn compute_vcs_status_block(
 /// When `override_info` is provided, uses remote workspace info and
 /// `vcs_status_override` (pre-fetched from the remote workspace) instead
 /// of local introspection.
+///
+/// `language` is forwarded into the `<user_info>` block (see
+/// [`construct_user_message_minimal`]).
 pub async fn construct_user_message(
     working_directory: &Path,
     vcs_kind: VcsKind,
     override_info: Option<&UserInfoOverride>,
     vcs_status_override: Option<String>,
+    language: Option<&str>,
 ) -> String {
     let cwd = working_directory.to_string_lossy().to_string();
     let vcs_block = if let Some(status) = vcs_status_override {
@@ -152,7 +170,8 @@ pub async fn construct_user_message(
         tracing::debug!(elapsed_ms = elapsed_ms as u64, "startup: user_prefix");
         block
     };
-    let mut user_info = construct_user_message_minimal(working_directory, override_info);
+    let mut user_info =
+        construct_user_message_minimal(working_directory, override_info, language);
     if let Some(vcs) = vcs_block {
         user_info.push_str(&vcs);
     }
@@ -173,7 +192,7 @@ mod tests {
     #[tokio::test]
     async fn construct_user_message_returns_without_git_status_on_bad_dir() {
         let dir = std::path::Path::new("/tmp/nonexistent-grok-test-dir");
-        let msg = construct_user_message(dir, VcsKind::Git, None, None).await;
+        let msg = construct_user_message(dir, VcsKind::Git, None, None, None).await;
         // user_info block is always present
         assert!(
             msg.contains("<user_info>"),
@@ -184,6 +203,21 @@ mod tests {
             !msg.contains("<git_status>"),
             "must not contain git_status for non-repo directory"
         );
+    }
+
+    #[test]
+    fn language_line_present_when_set() {
+        let dir = std::path::Path::new("/tmp");
+        let msg = construct_user_message_minimal(dir, None, Some("简体中文"));
+        assert!(msg.contains("Preferred language: 简体中文"));
+        assert!(msg.contains("commit messages"));
+    }
+
+    #[test]
+    fn language_line_absent_when_unset() {
+        let dir = std::path::Path::new("/tmp");
+        let msg = construct_user_message_minimal(dir, None, None);
+        assert!(!msg.contains("Preferred language:"));
     }
 
     #[test]
