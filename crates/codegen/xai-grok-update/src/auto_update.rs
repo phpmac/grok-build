@@ -385,7 +385,15 @@ impl BackgroundUpdateCheck {
 /// ready when the user quits and relaunches. When another process (an earlier
 /// TUI, the leader's hourly checker) already put the target version on disk,
 /// no download is started — only the restart hint is surfaced.
-pub async fn check_update_background(update_config: &UpdateConfig) -> BackgroundUpdateCheck {
+pub async fn check_update_background(_update_config: &UpdateConfig) -> BackgroundUpdateCheck {
+    // Local fork: never auto-check or background-download official updates.
+    BackgroundUpdateCheck::none()
+}
+
+/// Previous body of [`check_update_background`], retained for manual tooling
+/// paths that may be re-enabled later. Not called from startup.
+#[allow(dead_code)]
+async fn check_update_background_impl(update_config: &UpdateConfig) -> BackgroundUpdateCheck {
     let Some(installer) = get_installer().await else {
         return BackgroundUpdateCheck::none();
     };
@@ -460,8 +468,59 @@ pub async fn check_update_background(update_config: &UpdateConfig) -> Background
     }
 }
 
+#[cfg(test)]
+mod auto_update_disabled_tests {
+    use super::{UpdateRunMode, check_update_background, run_update_if_available};
+    use crate::version::UpdateConfig;
+
+    fn test_update_config() -> UpdateConfig {
+        UpdateConfig {
+            proxy_base_url: "https://example.invalid/v1".into(),
+            auth_scope: "test".into(),
+            deployment_key: None,
+            alpha_test_key: None,
+            channel: "stable".into(),
+            npm_registry: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn check_update_background_is_noop() {
+        let result = check_update_background(&test_update_config()).await;
+        assert!(result.update.is_none());
+        assert!(result.download.is_none());
+    }
+
+    #[tokio::test]
+    async fn run_update_if_available_is_noop() {
+        let ran = run_update_if_available(
+            UpdateRunMode::NonBlocking,
+            false,
+            &test_update_config(),
+        )
+        .await
+        .expect("noop must succeed");
+        assert!(!ran);
+    }
+}
+
 /// Returns Ok(true) if a blocking update ran; otherwise Ok(false).
+///
+/// Local fork: startup auto-update is disabled. This always returns `Ok(false)`
+/// so launch paths never prompt or download. Use explicit `grok update` /
+/// [`run_update`] for a manual install.
 pub async fn run_update_if_available(
+    _run_mode: UpdateRunMode,
+    _interactive: bool,
+    _update_config: &UpdateConfig,
+) -> Result<bool> {
+    Ok(false)
+}
+
+/// Previous body of [`run_update_if_available`]. Kept for reference / possible
+/// re-enable; not used by startup.
+#[allow(dead_code)]
+async fn run_update_if_available_impl(
     run_mode: UpdateRunMode,
     interactive: bool,
     update_config: &UpdateConfig,
@@ -483,19 +542,9 @@ pub async fn run_update_if_available(
         return Ok(false);
     }
 
-    // Resolve effective auto_update: None defaults to true (first-run).
-    let auto_update = current_config.cli.auto_update.unwrap_or(true);
-
-    if current_config.cli.auto_update.is_none()
-        && let Err(e) = config::update_config(|st| {
-            if st.cli.auto_update.is_none() {
-                st.cli.auto_update = Some(true);
-            }
-        })
-        .await
-    {
-        tracing::warn!("Failed to save auto-update setting: {}", e);
-    }
+    // Resolve effective auto_update: None defaults to false (local/fork builds
+    // should not pull official updates unless the user opts in).
+    let auto_update = current_config.cli.auto_update.unwrap_or(false);
 
     let current_version = get_installed_grok_version();
     // installer is guaranteed Some by the guard at the top of this function.

@@ -2082,19 +2082,24 @@ fn build_update_config() -> UpdateConfig {
     }
     config
 }
-/// Centralized gate for all auto-update checks. Add new suppression
-/// rules here — not at each call site.
-fn should_check_for_updates(no_auto_update_flag: bool) -> bool {
-    if cfg!(debug_assertions) {
-        return false;
+/// Centralized gate for all auto-update checks.
+///
+/// Local fork: never auto-check or download official updates. Version
+/// display remains; manual `grok update` is unchanged. `no_auto_update_flag`
+/// is accepted so call sites stay stable.
+fn should_check_for_updates(_no_auto_update_flag: bool) -> bool {
+    false
+}
+
+#[cfg(test)]
+mod should_check_for_updates_tests {
+    use super::should_check_for_updates;
+
+    #[test]
+    fn never_checks_for_updates() {
+        assert!(!should_check_for_updates(false));
+        assert!(!should_check_for_updates(true));
     }
-    if no_auto_update_flag {
-        return false;
-    }
-    if std::env::var_os("GROK_DISABLE_AUTOUPDATER").is_some() {
-        return false;
-    }
-    true
 }
 /// Mode-gate for the direct stdio agent's background auto-update.
 ///

@@ -973,7 +973,7 @@ pub struct AppView {
     pub coding_data_retention_opt_out: bool,
     /// Persisted `[cli].show_tips` mirror. `None` = no override (default `true`).
     pub show_tips: Option<bool>,
-    /// Persisted `[cli].auto_update` mirror. `None` = no override (default `true`).
+    /// Persisted `[cli].auto_update` mirror. `None` = no override (default `false`).
     pub auto_update: Option<bool>,
     /// Persisted `[toolset.ask_user_question].timeout_enabled` mirror, seeded
     /// from the effective TOML merge like `show_tips`. `None` = unset in TOML
