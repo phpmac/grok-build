@@ -111,19 +111,9 @@ jobs:
           mapfile -t files < <(find artifacts -type f \( -name 'grok-*.tar.gz' -o -name 'grok-*.tar.gz.sha256' \) | sort)
           test "${#files[@]}" -gt 0
 
-          notes="本地编译产物 (二进制名为 \`grok\`).
-
-          | 平台 | 文件 |
-          |------|------|
-          | macOS Apple Silicon | \`grok-aarch64-apple-darwin.tar.gz\` |
-          | macOS Intel | \`grok-x86_64-apple-darwin.tar.gz\` |
-          | Linux x86_64 | \`grok-x86_64-unknown-linux-gnu.tar.gz\` |
-          | Linux aarch64 | \`grok-aarch64-unknown-linux-gnu.tar.gz\` |
-
-          解压后: \`chmod +x grok && ./grok\`"
-
+          # notes 由发版流程事先写好; 此处仅上传产物, 不覆盖已有说明.
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "${files[@]}" --clobber
           else
-            gh release create "$tag" "${files[@]}" --title "$tag" --notes "$notes"
+            gh release create "$tag" "${files[@]}" --title "$tag" --generate-notes
           fi
