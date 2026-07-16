@@ -102,14 +102,15 @@ pub fn effective_compact(user_compact: bool, terminal_rows: u16) -> bool {
 /// prompt height + todo height. Shared widgets use these rects to render into.
 pub struct AgentViewLayout {
     pub status_bar: Rect,
-    /// Startup terminal-warning banner (between status bar and bg tasks/scrollback).
+    /// Startup terminal-warning banner (between status bar and catalog/todo/scrollback).
     pub startup_warnings: Rect,
+    /// Background tasks pane (below scrollback/queue, above turn status / prompt).
     pub tasks: Rect,
     pub catalog: Rect,
     pub scrollback: Rect,
     pub todo: Rect,
     pub queue: Rect,
-    /// Inline /btw side question panel (above queue / turn status / prompt).
+    /// Inline /btw side question panel (above queue / tasks / turn status / prompt).
     pub btw: Rect,
     pub turn_status: Rect,
     /// Banner rect above the prompt (mode-switch banner, ephemeral tips).
@@ -205,10 +206,7 @@ impl AgentViewLayout {
             constraints.push(Constraint::Length(startup_warning_height));
         }
         let pane_gap = if top_vpad == 0 { 0u16 } else { 1 };
-        if tasks_height > 0 {
-            constraints.push(Constraint::Length(pane_gap));
-            constraints.push(Constraint::Length(tasks_height));
-        }
+        // Top stack: catalog + todo only (tasks live below scrollback near prompt).
         if catalog_height > 0 {
             constraints.push(Constraint::Length(pane_gap));
             constraints.push(Constraint::Length(catalog_height));
@@ -227,6 +225,11 @@ impl AgentViewLayout {
         if queue_height > 0 {
             constraints.push(Constraint::Length(1));
             constraints.push(Constraint::Length(queue_height));
+        }
+        // Tasks at bottom of main content (above turn status / prompt).
+        if tasks_height > 0 {
+            constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(tasks_height));
         }
         if turn_status_height > 0 {
             constraints.push(Constraint::Length(1));
@@ -267,14 +270,6 @@ impl AgentViewLayout {
         } else {
             Rect::default()
         };
-        let tasks = if tasks_height > 0 {
-            i += 1;
-            let r = chunks[i];
-            i += 1;
-            r
-        } else {
-            Rect::default()
-        };
         let catalog = if catalog_height > 0 {
             i += 1;
             let r = chunks[i];
@@ -303,6 +298,14 @@ impl AgentViewLayout {
             Rect::default()
         };
         let queue = if queue_height > 0 {
+            i += 1;
+            let r = chunks[i];
+            i += 1;
+            r
+        } else {
+            Rect::default()
+        };
+        let tasks = if tasks_height > 0 {
             i += 1;
             let r = chunks[i];
             i += 1;
@@ -1778,6 +1781,47 @@ mod tests {
     }
     fn layout_with_cta(area: Rect, cta_height: u16) -> AgentViewLayout {
         layout_with_rows(area, 0, cta_height, 0)
+    }
+
+    #[test]
+    fn tasks_pane_sits_below_scrollback_above_prompt() {
+        let area = Rect::new(0, 0, 80, 40);
+        let layout_cfg = LayoutConfig::default();
+        let scrollbar_cfg = ScrollbarConfig::default();
+        let layout = AgentViewLayout::compute(
+            area,
+            &layout_cfg,
+            &scrollbar_cfg,
+            0,
+            2,  // prompt_height
+            4,  // tasks_height
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1, // shortcuts
+            false,
+        );
+        assert!(layout.tasks.height > 0, "tasks pane should be allocated");
+        assert!(
+            layout.tasks.y >= layout.scrollback.y + layout.scrollback.height,
+            "tasks should be below scrollback: tasks.y={} scrollback bottom={}",
+            layout.tasks.y,
+            layout.scrollback.y + layout.scrollback.height
+        );
+        assert!(
+            layout.tasks.y + layout.tasks.height <= layout.prompt.y,
+            "tasks should sit above prompt: tasks bottom={} prompt.y={}",
+            layout.tasks.y + layout.tasks.height,
+            layout.prompt.y
+        );
     }
     /// Minimal layout with a timeline rail request — hides the cfg-dependent
     /// arity of `compute` like `layout_with_rows` does.
