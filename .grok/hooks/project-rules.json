@@ -1,0 +1,38 @@
+{
+  "description": "Claude Code hookify 规则兼容",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .grok/hooks/scripts/rules_engine.py pre",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .grok/hooks/scripts/rules_engine.py post",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .grok/hooks/scripts/rules_engine.py stop",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
