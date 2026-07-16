@@ -1,0 +1,17 @@
+{
+  "description": "Write/Edit 时若内容含中文标点或 emoji, soft-warn 放行并提示模型 (decision=allow + reason)",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|write|search_replace|hashline_edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bin/chinese-punctuation-warn.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

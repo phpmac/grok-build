@@ -6,10 +6,10 @@
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
-use serde::Deserialize;
 use url::Url;
 
 use crate::config::HookSpec;
+use crate::decision_parse::{parse_hook_json, ParseHookJson};
 use crate::event::HookEventEnvelope;
 use crate::result::{HookDecision, HttpInfo};
 
@@ -17,14 +17,6 @@ use super::{HookRunOutput, HookRunnerResult, RunContext};
 
 /// Maximum characters to keep from the response body for the preview.
 const RESPONSE_PREVIEW_MAX: usize = 200;
-
-/// The JSON result structure expected from blocking HTTP hooks.
-#[derive(Debug, Deserialize)]
-struct HttpHookOutput {
-    decision: String,
-    #[serde(default)]
-    reason: Option<String>,
-}
 
 /// CWE-918: Returns `true` if an IP address is in a private, link-local,
 /// or cloud metadata range that should be blocked to prevent SSRF attacks.
@@ -325,45 +317,28 @@ fn parse_http_blocking_result(
     status: reqwest::StatusCode,
     hook_name: &str,
 ) -> HookRunnerResult {
-    if response_text.trim().is_empty() {
-        // No body: use HTTP status as fallback.
-        if status.is_success() {
-            return HookRunnerResult::Decision(HookDecision::Allow);
-        }
-        return HookRunnerResult::Failed(format!("HTTP status {} with empty body", status));
-    }
-
-    match serde_json::from_str::<HttpHookOutput>(response_text) {
-        Ok(output) => {
-            if output.decision == "deny" {
-                let reason = output
-                    .reason
-                    .unwrap_or_else(|| format!("denied by hook '{}'", hook_name));
-                HookRunnerResult::Decision(HookDecision::Deny {
-                    reason,
-                    hook_name: hook_name.to_string(),
-                })
-            } else if output.decision == "allow" {
-                HookRunnerResult::Decision(HookDecision::Allow)
+    match parse_hook_json(response_text, hook_name) {
+        ParseHookJson::Decision(decision) => HookRunnerResult::Decision(decision),
+        ParseHookJson::UnknownDecision(value) => HookRunnerResult::Failed(format!(
+            "unknown decision value '{value}' from hook '{hook_name}'"
+        )),
+        ParseHookJson::Empty => {
+            if status.is_success() {
+                HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
             } else {
-                HookRunnerResult::Failed(format!(
-                    "unknown decision value '{}' from hook '{}'",
-                    output.decision, hook_name
-                ))
+                HookRunnerResult::Failed(format!("HTTP status {} with empty body", status))
             }
         }
-        Err(e) => {
-            // Cannot parse response: fail-open if status is success.
+        ParseHookJson::InvalidJson => {
             if status.is_success() {
                 tracing::warn!(
                     hook_name = %hook_name,
-                    error = %e,
                     "could not parse HTTP hook response JSON, treating as allow"
                 );
-                HookRunnerResult::Decision(HookDecision::Allow)
+                HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
             } else {
                 HookRunnerResult::Failed(format!(
-                    "HTTP status {} and failed to parse response: {e}",
+                    "HTTP status {} and failed to parse response body",
                     status
                 ))
             }
@@ -406,7 +381,7 @@ mod tests {
             parse_http_blocking_result(r#"{"decision":"allow"}"#, StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow)
+            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
         ));
     }
 
@@ -459,7 +434,7 @@ mod tests {
         let result = parse_http_blocking_result("", StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow)
+            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
         ));
     }
 
@@ -468,7 +443,7 @@ mod tests {
         let result = parse_http_blocking_result("   \n  ", StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow)
+            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
         ));
     }
 
@@ -490,7 +465,7 @@ mod tests {
         let result = parse_http_blocking_result("not json at all", StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow)
+            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
         ));
     }
 
@@ -531,7 +506,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow)
+            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
         ));
     }
 
@@ -541,7 +516,7 @@ mod tests {
             parse_http_blocking_result(r#"{"decision":"deny""#, StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow)
+            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
         ));
     }
 

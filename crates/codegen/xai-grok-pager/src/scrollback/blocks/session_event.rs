@@ -354,9 +354,9 @@ impl EndWork {
 
 /// Block that renders a [`SessionEvent`] in scrollback.
 ///
-/// Visually identical to [`super::SystemMessageBlock`] (muted text, compact,
-/// unselectable). The structured `event` field is available for future
-/// styling differentiation (e.g., red text for failures).
+/// Compact, unselectable session chrome. Most variants use muted text like
+/// [`super::SystemMessageBlock`]; actionable variants (re-auth, context
+/// overflow, hook block/warn annotations) use warning/error colors.
 #[derive(Debug, Clone)]
 pub struct SessionEventBlock {
     /// The typed event data.
@@ -610,7 +610,11 @@ impl BlockContent for SessionEventBlock {
         let theme = Theme::current();
         // Failures and re-auth / context-overflow prompts are actionable, not
         // informational — render them in the warning color, not muted noise.
-        let style = if matches!(
+        // Hook block/warn annotations must be red and high-contrast under the
+        // tool call (both deny and soft-warn allow).
+        let style = if matches!(self.event, SessionEvent::HookAnnotation { .. }) {
+            theme.fg(theme.accent_error)
+        } else if matches!(
             self.event,
             SessionEvent::ReAuthRequired
                 | SessionEvent::ContextTooLarge
@@ -658,7 +662,9 @@ impl BlockContent for SessionEventBlock {
             return (ctx.mode != DisplayMode::Collapsed)
                 .then(|| AccentStyle::static_color(theme.accent_tool));
         }
-        if matches!(
+        if matches!(self.event, SessionEvent::HookAnnotation { .. }) {
+            Some(AccentStyle::static_color(theme.accent_error))
+        } else if matches!(
             self.event,
             SessionEvent::ReAuthRequired
                 | SessionEvent::ContextTooLarge
@@ -949,6 +955,37 @@ mod tests {
             block.accent(&ctx()).map(|a| a.color),
             Some(theme.warning),
             "an actionable compaction failure must use a warning accent, not muted"
+        );
+    }
+
+    #[test]
+    fn hook_annotation_uses_error_red_not_muted() {
+        let block = SessionEventBlock::new(SessionEvent::HookAnnotation {
+            message: "⚠ `read_file` blocked by hook `rules`: no secrets".into(),
+        });
+        let theme = Theme::current();
+        assert_eq!(
+            block.accent(&ctx()).map(|a| a.color),
+            Some(theme.accent_error),
+            "hook block/warn annotations must render in red under the tool call"
+        );
+        let out = block.output(&ctx());
+        let has_error_fg = out.lines.iter().any(|line| {
+            line.content.spans.iter().any(|span| {
+                span.style.fg == Some(theme.accent_error)
+                    || span.style.fg
+                        == ratatui::style::Style::default()
+                            .fg(theme.accent_error)
+                            .fg
+            })
+        });
+        assert!(
+            has_error_fg,
+            "hook annotation text must use accent_error, got: {:?}",
+            out.lines
+                .iter()
+                .flat_map(|l| l.content.spans.iter().map(|s| s.style.fg))
+                .collect::<Vec<_>>()
         );
     }
 

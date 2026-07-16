@@ -94,20 +94,17 @@ fn hooks_count_spans(success: usize, failed: usize) -> Option<Vec<Span<'static>>
     if success > 0 {
         spans.push(Span::styled(
             format!("{}", success),
-            theme
-                .fg(theme.accent_success)
-                .add_modifier(ratatui::style::Modifier::DIM),
+            theme.fg(theme.accent_success),
         ));
     }
     if success > 0 && failed > 0 {
         spans.push(Span::styled("/", theme.muted()));
     }
     if failed > 0 {
+        // Failures stay full red (no DIM) so blocked hooks remain readable.
         spans.push(Span::styled(
             format!("{}", failed),
-            theme
-                .fg(theme.accent_error)
-                .add_modifier(ratatui::style::Modifier::DIM),
+            theme.fg(theme.accent_error),
         ));
     }
     spans.push(Span::styled("]", theme.muted()));
@@ -232,15 +229,17 @@ fn render_hooks_expanded_inner(runs: &[HookRunEntry]) -> Vec<BlockLine> {
                 );
             }
             HookRunStatus::Failed { error, elapsed } => {
+                let err_style = theme.fg(theme.accent_error);
                 lines.push(
                     Line::from(vec![
                         Span::styled(format!("{}  ", INDENT), theme.muted()),
                         Span::styled(
                             format!("{} ", crate::glyphs::ballot_x()),
-                            theme.fg(theme.accent_error),
+                            err_style,
                         ),
-                        Span::styled(run.name.clone(), theme.muted()),
-                        Span::styled(format!(" ({}ms)", elapsed.as_millis()), theme.muted()),
+                        // Name + timing in red so block/warn detail is not dim.
+                        Span::styled(run.name.clone(), err_style),
+                        Span::styled(format!(" ({}ms)", elapsed.as_millis()), err_style),
                     ])
                     .into(),
                 );
@@ -253,7 +252,7 @@ fn render_hooks_expanded_inner(runs: &[HookRunEntry]) -> Vec<BlockLine> {
                     lines.push(
                         Line::from(vec![
                             Span::styled(format!("{}      ", INDENT), theme.muted()),
-                            Span::styled(err_line.to_string(), theme.fg(theme.accent_error)),
+                            Span::styled(err_line.to_string(), err_style),
                         ])
                         .into(),
                     );
@@ -261,14 +260,19 @@ fn render_hooks_expanded_inner(runs: &[HookRunEntry]) -> Vec<BlockLine> {
             }
         }
 
-        // Truncated output (if present)
+        // Truncated output (if present). Failed hooks keep output red so the
+        // intercept reason under the tool call stays high-contrast.
         if let Some(ref output) = run.output {
+            let out_style = match &run.status {
+                HookRunStatus::Failed { .. } => theme.fg(theme.accent_error),
+                _ => theme.muted(),
+            };
             let truncated = crate::render::line_utils::truncate_str(output, 120);
             for out_line in truncated.lines().take(3) {
                 lines.push(
                     Line::from(vec![
                         Span::styled(format!("{}      ", INDENT), theme.muted()),
-                        Span::styled(out_line.to_string(), theme.muted()),
+                        Span::styled(out_line.to_string(), out_style),
                     ])
                     .into(),
                 );

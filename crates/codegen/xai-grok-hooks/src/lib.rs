@@ -13,7 +13,7 @@
 //!
 //! - Four event types: `session_start`, `pre_tool_use`, `post_tool_use`, `session_end`
 //! - Command-backed hooks only
-//! - `pre_tool_use` hooks can deny/allow (blocking); all others are non-blocking
+//! - `pre_tool_use` hooks can deny (block) or allow with optional soft-warn context
 //! - Fail-open by default: hook failures do not block normal operation
 //!
 //! ## Quick start
@@ -37,6 +37,7 @@
 //! ```
 
 pub mod config;
+pub mod decision_parse;
 pub mod discovery;
 pub mod dispatcher;
 mod env_expand;

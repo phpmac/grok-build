@@ -190,7 +190,14 @@ The event is sent as JSON on **stdin** (for example, a `PreToolUse` event; the p
 For `PreToolUse` hooks, write JSON to **stdout**:
 
 - **Allow**: `{"decision": "allow"}`
-- **Deny**: `{"decision": "deny", "reason": "Unsafe command detected"}`
+- **Deny / block** (tool does not run; model sees `Hook denied: ...` as tool_result):
+  `{"decision": "deny", "reason": "Unsafe command detected"}`
+- **Warn** (tool still runs; model sees `Hook warn: ...` prepended to tool_result):
+  `{"decision": "allow", "reason": "Prefer firecrawl over curl"}`
+  or Claude/hookify shape:
+  `{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"..."}}`
+- Claude **block**:
+  `{"hookSpecificOutput":{"permissionDecision":"deny","additionalContext":"..."}}`
 
 ### Exit Codes
 

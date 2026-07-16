@@ -36,7 +36,7 @@ pub async fn dispatch_pre_tool_use(
     let hooks = registry.hooks_for(HookEventName::PreToolUse);
     if hooks.is_empty() {
         return PreToolUseResult {
-            decision: HookDecision::Allow,
+            decision: HookDecision::allow(),
             results: Vec::new(),
         };
     }
@@ -55,6 +55,8 @@ pub async fn dispatch_pre_tool_use(
 
     let tool_name = extract_tool_name(envelope);
     let mut run_results = Vec::new();
+    // Soft-warn messages from allow+context hooks, merged if multiple fire.
+    let mut warn_contexts: Vec<String> = Vec::new();
 
     for spec in hooks {
         if !spec.enabled || crate::trust::is_hook_disabled(&spec.name) {
@@ -105,12 +107,24 @@ pub async fn dispatch_pre_tool_use(
                     results: run_results,
                 };
             }
-            HookRunnerResult::Decision(HookDecision::Allow) => {
-                tracing::info!(
-                    hook_name = %spec.name,
-                    elapsed_ms = elapsed.as_millis() as u64,
-                    "hook allowed"
-                );
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context,
+            }) => {
+                if let Some(ref ctx) = additional_context {
+                    tracing::info!(
+                        hook_name = %spec.name,
+                        elapsed_ms = elapsed.as_millis() as u64,
+                        context_len = ctx.len(),
+                        "hook allowed with soft-warn context"
+                    );
+                    warn_contexts.push(ctx.clone());
+                } else {
+                    tracing::info!(
+                        hook_name = %spec.name,
+                        elapsed_ms = elapsed.as_millis() as u64,
+                        "hook allowed"
+                    );
+                }
                 run_results.push(HookRunResult::Success {
                     hook_name: spec.name.clone(),
                     elapsed,
@@ -153,8 +167,13 @@ pub async fn dispatch_pre_tool_use(
     }
 
     record_dispatch_counts(&span, &run_results, 0);
+    let decision = if warn_contexts.is_empty() {
+        HookDecision::allow()
+    } else {
+        HookDecision::allow_with_context(warn_contexts.join("\n\n"))
+    };
     PreToolUseResult {
-        decision: HookDecision::Allow,
+        decision,
         results: run_results,
     }
 }
@@ -460,7 +479,7 @@ mod tests {
         let registry = registry_from_specs(vec![]);
         let envelope = pre_tool_use_envelope("run_terminal_cmd");
         let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
-        assert_eq!(result.decision, HookDecision::Allow);
+        assert_eq!(result.decision, HookDecision::allow());
     }
 
     #[tokio::test]
@@ -469,7 +488,7 @@ mod tests {
         let registry = registry_from_specs(vec![spec]);
         let envelope = pre_tool_use_envelope("run_terminal_cmd");
         let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
-        assert_eq!(result.decision, HookDecision::Allow);
+        assert_eq!(result.decision, HookDecision::allow());
     }
 
     #[tokio::test]
@@ -507,7 +526,7 @@ mod tests {
         let registry = registry_from_specs(vec![spec]);
         let envelope = pre_tool_use_envelope("run_terminal_cmd");
         let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
-        assert_eq!(result.decision, HookDecision::Allow);
+        assert_eq!(result.decision, HookDecision::allow());
     }
 
     #[tokio::test]
@@ -522,7 +541,7 @@ mod tests {
         let registry = registry_from_specs(vec![spec]);
         let envelope = pre_tool_use_envelope("run_terminal_cmd");
         let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
-        assert_eq!(result.decision, HookDecision::Allow);
+        assert_eq!(result.decision, HookDecision::allow());
     }
 
     #[tokio::test]
@@ -638,7 +657,7 @@ mod tests {
         let registry = registry_from_specs(vec![allow_spec, deny_spec]);
         let envelope = pre_tool_use_envelope("run_terminal_cmd");
         let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
-        assert_eq!(result.decision, HookDecision::Allow);
+        assert_eq!(result.decision, HookDecision::allow());
     }
 
     #[tokio::test]
@@ -651,7 +670,7 @@ mod tests {
         let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
         assert_eq!(
             result.decision,
-            HookDecision::Allow,
+            HookDecision::allow(),
             "fail-open: a crashing hook must not block the tool call"
         );
         assert_eq!(result.results.len(), 1);
@@ -702,7 +721,90 @@ mod tests {
         let registry = registry_from_specs(specs);
         let envelope = pre_tool_use_envelope("run_terminal_cmd");
         let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
-        assert_eq!(result.decision, HookDecision::Allow);
+        assert_eq!(result.decision, HookDecision::allow());
+    }
+
+    #[tokio::test]
+    async fn soft_warn_allow_with_context_does_not_block() {
+        // Claude / hookify warn: additionalContext only, no permissionDecision deny.
+        let warn = make_command_spec(
+            "warner",
+            None,
+            true,
+            r#"echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"hookify warn: use firecrawl"},"systemMessage":"human tip"}'"#,
+        );
+        let registry = registry_from_specs(vec![warn]);
+        let envelope = pre_tool_use_envelope("run_terminal_cmd");
+        let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
+        assert!(
+            !result.decision.is_deny(),
+            "warn must not deny the tool call"
+        );
+        assert_eq!(
+            result.decision.additional_context(),
+            Some("hookify warn: use firecrawl"),
+            "model must receive warn text via additional_context"
+        );
+        let for_model = crate::result::prepend_hook_warn_to_tool_result(
+            result.decision.additional_context().expect("ctx"),
+            "tool ok",
+        );
+        assert!(
+            for_model.starts_with("Hook warn:"),
+            "tool_result prefix must be model-readable: {for_model}"
+        );
+        assert!(for_model.contains("hookify warn: use firecrawl"));
+        assert!(for_model.contains("tool ok"));
+    }
+
+    #[tokio::test]
+    async fn claude_permission_deny_blocks_with_reason_for_model() {
+        let block = make_command_spec(
+            "blocker",
+            None,
+            true,
+            r#"echo '{"hookSpecificOutput":{"permissionDecision":"deny","additionalContext":"hookify block: no curl to github"}}'"#,
+        );
+        let registry = registry_from_specs(vec![block]);
+        let envelope = pre_tool_use_envelope("run_terminal_cmd");
+        let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
+        match result.decision {
+            HookDecision::Deny { reason, hook_name } => {
+                assert_eq!(hook_name, "blocker");
+                assert!(
+                    reason.contains("hookify block"),
+                    "block reason for model: {reason}"
+                );
+                assert_eq!(
+                    crate::result::format_hook_denied_for_model(&reason),
+                    format!("Hook denied: {reason}")
+                );
+            }
+            other => panic!("expected Deny, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn merge_multiple_soft_warns() {
+        let w1 = make_command_spec(
+            "w1",
+            None,
+            true,
+            r#"echo '{"decision":"allow","reason":"warn-one"}'"#,
+        );
+        let w2 = make_command_spec(
+            "w2",
+            None,
+            true,
+            r#"echo '{"decision":"allow","reason":"warn-two"}'"#,
+        );
+        let registry = registry_from_specs(vec![w1, w2]);
+        let envelope = pre_tool_use_envelope("run_terminal_cmd");
+        let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
+        let ctx = result.decision.additional_context().expect("merged");
+        assert!(ctx.contains("warn-one"), "{ctx}");
+        assert!(ctx.contains("warn-two"), "{ctx}");
+        assert!(!result.decision.is_deny());
     }
 
     #[tokio::test]
@@ -723,7 +825,7 @@ mod tests {
         let registry = registry_from_specs(vec![disabled_deny, enabled_allow]);
         let envelope = pre_tool_use_envelope("run_terminal_cmd");
         let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
-        assert_eq!(result.decision, HookDecision::Allow);
+        assert_eq!(result.decision, HookDecision::allow());
     }
 
     // ── fail-open regression tests ───────────────────────────────
@@ -739,7 +841,7 @@ mod tests {
         let result = dispatch_pre_tool_use(&registry, &envelope, &run_ctx()).await;
         assert_eq!(
             result.decision,
-            HookDecision::Allow,
+            HookDecision::allow(),
             "fail-open: bad output must not block the tool call"
         );
         assert_eq!(result.results.len(), 1);

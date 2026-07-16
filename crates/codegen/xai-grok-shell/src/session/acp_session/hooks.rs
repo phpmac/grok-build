@@ -188,7 +188,7 @@ impl SessionActor {
         self.handle_tool_not_executed(
             model_call_id,
             tool_call_id,
-            format!("Hook denied: {reason}"),
+            xai_grok_hooks::result::format_hook_denied_for_model(&reason),
         )
         .await?;
         self.send_hook_annotation(&format!(

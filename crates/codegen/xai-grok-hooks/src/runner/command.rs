@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
-use serde::Deserialize;
 use tokio::io::AsyncWriteExt;
 
 use crate::config::HookSpec;
+use crate::decision_parse::{parse_hook_json, ParseHookJson};
 use crate::event::HookEventEnvelope;
 use crate::result::HookDecision;
 
@@ -14,14 +14,6 @@ const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 
 /// Exit code that a blocking hook uses to signal an explicit deny.
 const DENY_EXIT_CODE: i32 = 2;
-
-/// The JSON result structure expected from blocking hooks.
-#[derive(Debug, Deserialize)]
-struct HookOutput {
-    decision: String,
-    #[serde(default)]
-    reason: Option<String>,
-}
 
 /// Run a single hook command.
 ///
@@ -441,61 +433,43 @@ fn parse_blocking_result(
     hook_name: &str,
     elapsed: Duration,
 ) -> (HookRunnerResult, Duration) {
-    // Try to parse JSON output first.
-    let json_decision = if !stdout.trim().is_empty() {
-        serde_json::from_str::<HookOutput>(stdout.trim()).ok()
-    } else {
-        None
-    };
-
-    // If we have valid JSON with a deny, prefer that over exit code.
-    if let Some(ref output) = json_decision {
-        if output.decision == "deny" {
-            let reason = output
-                .reason
-                .clone()
-                .unwrap_or_else(|| format!("denied by hook '{hook_name}'"));
-
-            if exit_code != DENY_EXIT_CODE && exit_code != 0 {
+    match parse_hook_json(stdout, hook_name) {
+        ParseHookJson::Decision(decision) => {
+            if decision.is_deny()
+                && exit_code != DENY_EXIT_CODE
+                && exit_code != 0
+            {
                 tracing::warn!(
                     hook_name,
                     exit_code,
-                    "JSON decision is 'deny' but exit code is not 0 or 2 — using JSON decision"
+                    "JSON decision is deny/block but exit code is not 0 or 2 — using JSON decision"
                 );
             }
-
+            if !decision.is_deny() && exit_code == DENY_EXIT_CODE {
+                tracing::warn!(
+                    hook_name,
+                    "JSON decision is allow/warn but exit code is 2 — using JSON decision"
+                );
+            }
+            return (HookRunnerResult::Decision(decision), elapsed);
+        }
+        ParseHookJson::UnknownDecision(value) => {
             return (
-                HookRunnerResult::Decision(HookDecision::Deny {
-                    reason,
-                    hook_name: hook_name.to_string(),
-                }),
+                HookRunnerResult::Failed(format!(
+                    "unknown decision value '{value}' from hook '{hook_name}'"
+                )),
                 elapsed,
             );
         }
-
-        if output.decision == "allow" {
-            if exit_code == DENY_EXIT_CODE {
-                tracing::warn!(
-                    hook_name,
-                    "JSON decision is 'allow' but exit code is 2 — using JSON decision"
-                );
-            }
-            return (HookRunnerResult::Decision(HookDecision::Allow), elapsed);
+        ParseHookJson::InvalidJson => {
+            // Fall through to exit-code handling (legacy / non-JSON scripts).
         }
-
-        // Unknown decision value — treat as failure.
-        return (
-            HookRunnerResult::Failed(format!(
-                "unknown decision value '{}' from hook '{hook_name}'",
-                output.decision
-            )),
-            elapsed,
-        );
+        ParseHookJson::Empty => {}
     }
 
-    // No valid JSON — fall back to exit code.
+    // No usable JSON decision — fall back to exit code.
     match exit_code {
-        0 => (HookRunnerResult::Decision(HookDecision::Allow), elapsed),
+        0 => (HookRunnerResult::Decision(HookDecision::allow()), elapsed),
         DENY_EXIT_CODE => (
             HookRunnerResult::Decision(HookDecision::Deny {
                 reason: format!("denied by hook '{hook_name}' (exit code {DENY_EXIT_CODE})"),
@@ -550,8 +524,34 @@ mod tests {
             parse_blocking_result(r#"{"decision":"allow"}"#, 0, "test", Duration::ZERO);
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow)
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: None
+            })
         ));
+    }
+
+    #[test]
+    fn parse_claude_warn_json() {
+        let body = r#"{"hookSpecificOutput":{"additionalContext":"prefer scrape"},"systemMessage":"w"}"#;
+        let (result, _) = parse_blocking_result(body, 0, "hookify", Duration::ZERO);
+        match result {
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: Some(ctx),
+            }) => assert_eq!(ctx, "prefer scrape"),
+            other => panic!("expected allow+warn, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_claude_block_json() {
+        let body = r#"{"hookSpecificOutput":{"permissionDecision":"deny","additionalContext":"blocked tip"}}"#;
+        let (result, _) = parse_blocking_result(body, 0, "hookify", Duration::ZERO);
+        match result {
+            HookRunnerResult::Decision(HookDecision::Deny { reason, .. }) => {
+                assert_eq!(reason, "blocked tip");
+            }
+            other => panic!("expected deny, got {other:?}"),
+        }
     }
 
     #[test]
@@ -587,7 +587,9 @@ mod tests {
         let (result, _) = parse_blocking_result("", 0, "test", Duration::ZERO);
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow)
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: None
+            })
         ));
     }
 
@@ -626,7 +628,9 @@ mod tests {
         let (result, _) = parse_blocking_result("not json at all", 0, "test", Duration::ZERO);
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow)
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: None
+            })
         ));
     }
 
@@ -824,7 +828,12 @@ mod tests {
         let (result, _duration) = run_command_hook(&spec, &envelope, &ctx, true).await;
 
         assert!(
-            matches!(result, HookRunnerResult::Decision(HookDecision::Allow)),
+            matches!(
+                result,
+                HookRunnerResult::Decision(HookDecision::Allow {
+                    additional_context: None
+                })
+            ),
             "blocking hook should return Allow, got {:?}",
             result
         );

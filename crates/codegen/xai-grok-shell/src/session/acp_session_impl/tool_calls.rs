@@ -545,6 +545,7 @@ impl SessionActor {
                             prepared.concatenated_json_count,
                             &prepared.model_id,
                             &prepared.parsed_args,
+                            prepared.pre_tool_hook_context.as_deref(),
                         )
                         .await?;
                     deferred_followups.extend(followups);
@@ -917,6 +918,7 @@ impl SessionActor {
         let resolved_tool_name = dispatch_target_name
             .clone()
             .unwrap_or_else(|| call.function.name.clone());
+        let mut pre_tool_hook_context: Option<String> = None;
         if self.hook_event_active(xai_grok_hooks::event::HookEventName::PreToolUse) {
             let (hook_tool_input, hook_tool_input_truncated) =
                 xai_grok_hooks::event::truncate_payload(raw_input.clone());
@@ -951,18 +953,32 @@ impl SessionActor {
                     &pre_result.results,
                 )
                 .await;
-                if let xai_grok_hooks::result::HookDecision::Deny { reason, hook_name } =
-                    pre_result.decision
-                {
-                    return Ok(Err(self
-                        .deny_tool(
-                            &call.id,
-                            &tool_call_id,
-                            resolved_tool_name.clone(),
-                            hook_name,
-                            reason,
-                        )
-                        .await?));
+                match pre_result.decision {
+                    xai_grok_hooks::result::HookDecision::Deny { reason, hook_name } => {
+                        return Ok(Err(self
+                            .deny_tool(
+                                &call.id,
+                                &tool_call_id,
+                                resolved_tool_name.clone(),
+                                hook_name,
+                                reason,
+                            )
+                            .await?));
+                    }
+                    xai_grok_hooks::result::HookDecision::Allow {
+                        additional_context,
+                    } => {
+                        if let Some(ctx) = additional_context {
+                            // Soft warn: tool still runs; context is attached to
+                            // PreparedToolCall and prepended to tool_result so the
+                            // model can read it (Claude Code / hookify warn).
+                            self.send_hook_annotation(&format!(
+                                "\u{26a0} `{resolved_tool_name}` warned by pre_tool_use hook: {ctx}"
+                            ))
+                            .await;
+                            pre_tool_hook_context = Some(ctx);
+                        }
+                    }
                 }
             }
             if let Some(denied) = self
@@ -1349,6 +1365,7 @@ impl SessionActor {
             concatenated_json_count,
             dispatch_target_name,
             is_read_only,
+            pre_tool_hook_context,
         };
         Ok(Ok(prepared))
     }
@@ -2009,6 +2026,7 @@ impl SessionActor {
         concatenated_json_count: usize,
         model_id: &str,
         tool_parsed_args: &serde_json::Value,
+        pre_tool_hook_context: Option<&str>,
     ) -> Result<Vec<ConversationItem>, acp::Error> {
         use crate::session::acp_conversion::{acp_plan_update, acp_tool_update, maybe_rewrite};
         let consumed_ids =
@@ -2177,6 +2195,11 @@ impl SessionActor {
                 pdf.pages.len(),
                 pdf.total_pages,
             );
+        }
+        // PreToolUse soft-warn: keep tool side-effects, surface message to the model.
+        if let Some(warn) = pre_tool_hook_context {
+            prompt_text =
+                xai_grok_hooks::result::prepend_hook_warn_to_tool_result(warn, &prompt_text);
         }
         let tool_chat = if inline_images.is_empty() {
             ConversationItem::tool_result(call_id.to_string(), prompt_text)

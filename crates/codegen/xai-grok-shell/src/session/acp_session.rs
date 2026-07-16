@@ -539,6 +539,9 @@ pub(crate) struct PreparedToolCall {
     dispatch_target_name: Option<String>,
     /// Read-only per `ToolKind`; decides whether the call takes the per-file lock.
     is_read_only: bool,
+    /// Soft-warn text from PreToolUse (Claude/hookify warn). When set, the
+    /// successful tool_result body is prefixed so the model can read it.
+    pre_tool_hook_context: Option<String>,
 }
 impl PreparedToolCall {
     /// The tool name hooks see: the resolved dispatch target, else the wire name.

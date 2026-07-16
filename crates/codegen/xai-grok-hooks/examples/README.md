@@ -73,6 +73,33 @@ cp examples/hooks/bin/tool-logger.sh ~/.grok/hooks/bin/
 chmod +x ~/.grok/hooks/bin/tool-logger.sh
 ```
 
+### 5. Chinese Punctuation Warn (`chinese-punctuation-warn.json`)
+
+**Type:** soft-warn (`PreToolUse` on Write/Edit)
+
+Write / `search_replace` 的内容若含中文标点或 emoji, **放行工具**, 并通过
+`{"decision":"allow","reason":"..."}` 把提示注入模型 (依赖 soft-warn 解析).
+
+**Install:**
+```sh
+mkdir -p ~/.grok/hooks/bin
+cp examples/hooks/chinese-punctuation-warn.json ~/.grok/hooks/
+cp examples/hooks/bin/chinese-punctuation-warn.py ~/.grok/hooks/bin/
+chmod +x ~/.grok/hooks/bin/chinese-punctuation-warn.py
+```
+
+**Self-test:**
+```sh
+python3 examples/hooks/bin/chinese-punctuation-warn.py --self-test
+```
+
+**Manual stdin probe (hit):**
+```sh
+printf '%s' '{"toolName":"write","toolInput":{"file_path":"/tmp/t.md","content":"你好，世界。"}}' \
+  | python3 examples/hooks/bin/chinese-punctuation-warn.py
+# 期望 stdout 含 "decision":"allow" 与 reason
+```
+
 ## Format
 
 Hook files use the Claude-compatible JSON format:
