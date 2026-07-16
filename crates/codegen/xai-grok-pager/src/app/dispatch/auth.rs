@@ -340,7 +340,9 @@ pub(super) fn handle_auth_complete(
             effects.push(Effect::FetchAppBilling);
         }
         // Fetch changelog (mirrors startup path for interactive login).
-        effects.push(Effect::FetchChangelog);
+        if !crate::local_ui::suppress_changelog() {
+            effects.push(Effect::FetchChangelog);
+        }
 
         // ZDR-blocked users stay on the welcome screen — discard any
         // deferred startup (they cannot start a session).

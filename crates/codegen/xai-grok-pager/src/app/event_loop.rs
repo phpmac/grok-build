@@ -843,20 +843,25 @@ pub(crate) async fn run(
     {
         use xai_grok_shell::util::config::{resolve_announcements, resolve_tips};
 
-        let remote_announcements = remote_settings
-            .as_ref()
-            .and_then(|s| s.announcements.as_deref());
-        let announcements = resolve_announcements(
-            requirements.as_ref(),
-            user_config.as_ref(),
-            managed_config.as_ref(),
-            remote_announcements,
-        );
-        app.active_announcements = xai_grok_announcements::filter_expired(announcements);
-        if !app.active_announcements.is_empty() {
-            use rand::Rng;
-            let idx = rand::rng().random_range(0..app.active_announcements.len());
-            app.announcement = app.active_announcements.get(idx).cloned();
+        if crate::local_ui::suppress_announcements() {
+            app.active_announcements.clear();
+            app.announcement = None;
+        } else {
+            let remote_announcements = remote_settings
+                .as_ref()
+                .and_then(|s| s.announcements.as_deref());
+            let announcements = resolve_announcements(
+                requirements.as_ref(),
+                user_config.as_ref(),
+                managed_config.as_ref(),
+                remote_announcements,
+            );
+            app.active_announcements = xai_grok_announcements::filter_expired(announcements);
+            if !app.active_announcements.is_empty() {
+                use rand::Rng;
+                let idx = rand::rng().random_range(0..app.active_announcements.len());
+                app.announcement = app.active_announcements.get(idx).cloned();
+            }
         }
         app.sync_session_announcement_slash_gate();
 
@@ -1246,11 +1251,16 @@ pub(crate) async fn run(
                 return Ok(make_run_result(&app));
             }
         }
-        // Fetch changelog off the render path so the welcome screen
-        // can display bullets and /release-notes uses the cached result.
-        let effs = vec![super::actions::Effect::FetchChangelog];
-        if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
-            return Ok(make_run_result(&app));
+        if crate::local_ui::suppress_changelog() {
+            app.changelog_markdown = None;
+            app.changelog_bullets.clear();
+        } else {
+            // Fetch changelog off the render path so the welcome screen
+            // can display bullets and /release-notes uses the cached result.
+            let effs = vec![super::actions::Effect::FetchChangelog];
+            if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+                return Ok(make_run_result(&app));
+            }
         }
         if !app.has_access() {
             gate_poll_at = Some(Instant::now() + GATE_POLL_INTERVAL);

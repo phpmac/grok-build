@@ -481,9 +481,14 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             vec![]
         }
         TaskResult::ChangelogFetched { markdown, entries } => {
-            app.changelog_markdown = markdown;
-            app.changelog_bullets =
-                xai_grok_shell::util::changelog::bullets_from_entries(&entries, 3);
+            if crate::local_ui::suppress_changelog() {
+                app.changelog_markdown = None;
+                app.changelog_bullets.clear();
+            } else {
+                app.changelog_markdown = markdown;
+                app.changelog_bullets =
+                    xai_grok_shell::util::changelog::bullets_from_entries(&entries, 3);
+            }
             vec![]
         }
         TaskResult::ClipboardAttachmentProbed {

@@ -18,6 +18,8 @@ pub mod hyperlink_route;
 pub mod inline_media_ffmpeg;
 pub mod input;
 pub mod input_log;
+/// Local product UI gates (hide announcements / changelog / logo in builds).
+pub mod local_ui;
 pub mod mcp_cmd;
 pub mod memory_cmd;
 pub mod memory_release;

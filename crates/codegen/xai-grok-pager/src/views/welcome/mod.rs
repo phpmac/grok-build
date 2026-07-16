@@ -1694,14 +1694,16 @@ fn render_welcome_done(
     } else {
         0
     };
-    let changelog_height = if p.has_access && !show_picker && !p.changelog_bullets.is_empty() {
+    let changelog_height = if crate::local_ui::suppress_changelog() {
+        0
+    } else if p.has_access && !show_picker && !p.changelog_bullets.is_empty() {
         2 + p.changelog_bullets.len() as u16
     } else {
         0
     };
-    // Changelog is reachable via this menu row (ctrl+l). Show from the first
-    // frame so the menu doesn't shift while the CDN fetch completes.
-    let show_changelog_action = p.has_access && !show_picker;
+    // Changelog menu row: off when suppressed; else show when access + no picker.
+    let show_changelog_action =
+        !crate::local_ui::suppress_changelog() && p.has_access && !show_picker;
 
     let gate_menu;
     let owned_menu;

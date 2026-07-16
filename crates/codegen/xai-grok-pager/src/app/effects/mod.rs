@@ -1753,9 +1753,12 @@ pub(crate) fn execute(
                 });
         }
         Effect::FetchChangelog => {
-            tasks
-                .spawn(async move {
-                    let changelog = tokio::task::spawn_blocking(|| {
+            if crate::local_ui::suppress_changelog() {
+                // Local product: no CDN/cache welcome changelog preload.
+            } else {
+                tasks
+                    .spawn(async move {
+                        let changelog = tokio::task::spawn_blocking(|| {
                             xai_grok_shell::util::changelog::ChangelogManager::new()
                                 .fetch()
                         })
@@ -1767,11 +1770,12 @@ pub(crate) fn execute(
                                 entries: None,
                             }
                         });
-                    TaskResult::ChangelogFetched {
-                        markdown: changelog.markdown,
-                        entries: changelog.entries.unwrap_or_default(),
-                    }
-                });
+                        TaskResult::ChangelogFetched {
+                            markdown: changelog.markdown,
+                            entries: changelog.entries.unwrap_or_default(),
+                        }
+                    });
+            }
         }
         Effect::PersistAnnouncementsHidden { hidden_ids } => {
             tasks

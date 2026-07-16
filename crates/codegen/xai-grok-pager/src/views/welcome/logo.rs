@@ -36,8 +36,9 @@ fn pick_logo_for(window_height: u16, hidden: bool) -> Option<&'static str> {
 }
 
 /// The braille art has no ASCII stand-in; see the module doc.
+/// Local product builds also hide the logo entirely via [`crate::local_ui`].
 fn logo_hidden() -> bool {
-    crate::glyphs::is_legacy_windows_console()
+    crate::local_ui::suppress_logo() || crate::glyphs::is_legacy_windows_console()
 }
 
 fn non_empty_lines(logo: &str) -> impl Iterator<Item = &str> {

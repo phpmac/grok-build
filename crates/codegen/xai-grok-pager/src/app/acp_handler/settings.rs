@@ -410,6 +410,14 @@ pub(super) fn apply_announcements_update(
     user_config: Option<&toml::Value>,
     managed_config: Option<&toml::Value>,
 ) {
+    if crate::local_ui::suppress_announcements() {
+        app.active_announcements.clear();
+        app.announcement = None;
+        app.announcements_last_gen = next_gen;
+        app.sync_session_announcement_slash_gate();
+        return;
+    }
+
     let merged = xai_grok_shell::util::config::resolve_announcements(
         requirements,
         user_config,

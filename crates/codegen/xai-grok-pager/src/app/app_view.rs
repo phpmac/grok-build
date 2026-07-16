@@ -3834,19 +3834,37 @@ impl AppView {
                             Some(eff) => format!("{model_name_base} ({eff})"),
                             None => model_name_base,
                         };
-                        let hero_cta = crate::views::announcements::promo_cta(
-                            &self.active_announcements,
-                            &self.hidden_announcement_ids,
-                        );
-                        let hero_announcement = hero_cta
-                            .map(|(owner, _, _)| owner)
-                            .or_else(|| {
-                                crate::views::announcements::first_session_announcement(
-                                    &self.active_announcements,
-                                    &self.hidden_announcement_ids,
+                        let hero_cta = if crate::local_ui::suppress_announcements() {
+                            None
+                        } else {
+                            crate::views::announcements::promo_cta(
+                                &self.active_announcements,
+                                &self.hidden_announcement_ids,
+                            )
+                        };
+                        let hero_announcement = if crate::local_ui::suppress_announcements() {
+                            None
+                        } else {
+                            hero_cta
+                                .map(|(owner, _, _)| owner)
+                                .or_else(|| {
+                                    crate::views::announcements::first_session_announcement(
+                                        &self.active_announcements,
+                                        &self.hidden_announcement_ids,
+                                    )
+                                })
+                                .or(self.announcement.as_ref())
+                        };
+                        let empty_changelog: &[String] = &[];
+                        let (changelog_bullets, changelog_has_full_notes) =
+                            if crate::local_ui::suppress_changelog() {
+                                (empty_changelog, false)
+                            } else {
+                                (
+                                    self.changelog_bullets.as_slice(),
+                                    self.changelog_markdown.is_some(),
                                 )
-                            })
-                            .or(self.announcement.as_ref());
+                            };
                         let welcome_params = crate::views::welcome::WelcomeRenderParams {
                             prompt_focus: if self.welcome_prompt_focused {
                                 WelcomePromptFocus::Focused
@@ -3896,10 +3914,14 @@ impl AppView {
                             auto_topup: self.auto_topup.as_ref(),
                             usage_visible: self.usage_visible,
                             is_api_key_auth: self.is_api_key_auth,
-                            changelog_bullets: &self.changelog_bullets,
-                            changelog_has_full_notes: self.changelog_markdown.is_some(),
+                            changelog_bullets,
+                            changelog_has_full_notes,
                             welcome_announcement_expanded: self.welcome_announcement.expanded,
-                            upgrade_cta: hero_cta.map(|(_owner, label, _)| label),
+                            upgrade_cta: if crate::local_ui::suppress_announcements() {
+                                None
+                            } else {
+                                hero_cta.map(|(_owner, label, _)| label)
+                            },
                         };
                         let result = crate::views::welcome::render_welcome(
                             view_area,
