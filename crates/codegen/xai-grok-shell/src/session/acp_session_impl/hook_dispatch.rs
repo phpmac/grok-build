@@ -211,29 +211,32 @@ impl SessionActor {
     /// Dispatch a non-blocking hook event: build the envelope, fire observe-only
     /// client hooks, then run the on-disk registry. No-op (no payload built) when no
     /// hook listens for `event`, so it stays inert when unused.
+    ///
+    /// Returns soft-warn text from allow+reason stdout (e.g. PostToolUse audit), if any.
     pub(super) async fn dispatch_hook(
         &self,
         event: xai_grok_hooks::event::HookEventName,
         payload: xai_grok_hooks::event::HookPayload,
         prompt_id: Option<&str>,
         tool_name: Option<&str>,
-    ) {
+    ) -> Option<String> {
         if !self.hook_event_active(event) {
-            return;
+            return None;
         }
         // Fires observe-only client hooks before (and independent of) the on-disk registry guard below.
         let envelope = self.fire_hook(event, prompt_id.map(|s| s.to_string()), payload);
         let Some(registry) = self.hook_registry.borrow().clone() else {
-            return;
+            return None;
         };
         let ctx = self.hook_run_ctx();
-        let results =
+        let out =
             xai_grok_hooks::dispatcher::dispatch_non_blocking(&registry, event, &envelope, &ctx)
                 .await;
-        self.send_hook_execution(&event.to_string(), tool_name, prompt_id, &results)
+        self.send_hook_execution(&event.to_string(), tool_name, prompt_id, &out.results)
             .await;
-        self.emit_hook_executed_telemetry(&event.to_string(), tool_name, &results)
+        self.emit_hook_executed_telemetry(&event.to_string(), tool_name, &out.results)
             .await;
+        out.additional_context
     }
 
     pub(super) async fn emit_hook_executed_telemetry(

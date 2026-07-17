@@ -107,9 +107,7 @@ pub async fn dispatch_pre_tool_use(
                     results: run_results,
                 };
             }
-            HookRunnerResult::Decision(HookDecision::Allow {
-                additional_context,
-            }) => {
+            HookRunnerResult::Decision(HookDecision::Allow { additional_context }) => {
                 if let Some(ref ctx) = additional_context {
                     tracing::info!(
                         hook_name = %spec.name,
@@ -178,20 +176,34 @@ pub async fn dispatch_pre_tool_use(
     }
 }
 
+/// Result of a non-blocking hook dispatch (`session_start`, `post_tool_use`, …).
+pub struct NonBlockingDispatchResult {
+    /// Per-hook run results for UI / telemetry.
+    pub results: Vec<HookRunResult>,
+    /// Soft-warn text merged from allow+reason (or post-deny-as-warn) decisions.
+    /// Callers (e.g. PostToolUse) should surface this to the model; never blocks.
+    pub additional_context: Option<String>,
+}
+
 /// Dispatch a non-blocking event (`session_start`, `post_tool_use`, `session_end`)
 /// against all matching hooks.
 ///
 /// Runs hooks sequentially, collects results. Never denies — callers log
-/// results and continue.
+/// results and continue. Soft-warn JSON on stdout is collected into
+/// [`NonBlockingDispatchResult::additional_context`] so PostToolUse audits
+/// can reach the model.
 pub async fn dispatch_non_blocking(
     registry: &HookRegistry,
     event: HookEventName,
     envelope: &HookEventEnvelope,
     ctx: &RunContext<'_>,
-) -> Vec<HookRunResult> {
+) -> NonBlockingDispatchResult {
     let hooks = registry.hooks_for(event);
     if hooks.is_empty() {
-        return Vec::new();
+        return NonBlockingDispatchResult {
+            results: Vec::new(),
+            additional_context: None,
+        };
     }
 
     let span = tracing::info_span!(
@@ -208,6 +220,7 @@ pub async fn dispatch_non_blocking(
 
     let tool_name = extract_tool_name(envelope);
     let mut results = Vec::with_capacity(hooks.len());
+    let mut warn_contexts: Vec<String> = Vec::new();
 
     for spec in hooks {
         if !spec.enabled || crate::trust::is_hook_disabled(&spec.name) {
@@ -262,12 +275,19 @@ pub async fn dispatch_non_blocking(
                     http_info,
                 });
             }
-            HookRunnerResult::Decision(_) => {
-                // Shouldn't happen for non-blocking hooks.
+            HookRunnerResult::Decision(decision) => {
+                // Soft-warn (or late deny treated as warn): keep Success for
+                // telemetry, accumulate text for model surface.
+                if let Some(ctx_text) = decision.additional_context() {
+                    warn_contexts.push(ctx_text.to_string());
+                } else if let HookDecision::Deny { reason, .. } = &decision {
+                    warn_contexts.push(reason.clone());
+                }
                 tracing::info!(
                     hook_name = %spec.name,
                     elapsed_ms = elapsed.as_millis() as u64,
-                    "hook completed"
+                    has_context = decision.additional_context().is_some() || decision.is_deny(),
+                    "hook completed (soft decision on non-blocking event)"
                 );
                 results.push(HookRunResult::Success {
                     hook_name: spec.name.clone(),
@@ -280,7 +300,16 @@ pub async fn dispatch_non_blocking(
 
     record_dispatch_counts(&span, &results, 0);
 
-    results
+    let additional_context = if warn_contexts.is_empty() {
+        None
+    } else {
+        Some(warn_contexts.join("\n\n"))
+    };
+
+    NonBlockingDispatchResult {
+        results,
+        additional_context,
+    }
 }
 
 /// Record hook outcome counts on the `hooks.dispatch` span. A blocking deny is
@@ -865,14 +894,15 @@ mod tests {
     async fn non_blocking_empty_registry() {
         let registry = registry_from_specs(vec![]);
         let envelope = session_start_envelope();
-        let results = dispatch_non_blocking(
+        let out = dispatch_non_blocking(
             &registry,
             HookEventName::SessionStart,
             &envelope,
             &run_ctx(),
         )
         .await;
-        assert!(results.is_empty());
+        assert!(out.results.is_empty());
+        assert!(out.additional_context.is_none());
     }
 
     #[tokio::test]
@@ -881,15 +911,15 @@ mod tests {
         spec.event = HookEventName::SessionStart;
         let registry = registry_from_specs(vec![spec]);
         let envelope = session_start_envelope();
-        let results = dispatch_non_blocking(
+        let out = dispatch_non_blocking(
             &registry,
             HookEventName::SessionStart,
             &envelope,
             &run_ctx(),
         )
         .await;
-        assert_eq!(results.len(), 1);
-        assert!(matches!(results[0], HookRunResult::Skipped { .. }));
+        assert_eq!(out.results.len(), 1);
+        assert!(matches!(out.results[0], HookRunResult::Skipped { .. }));
     }
 
     #[tokio::test]
@@ -898,15 +928,38 @@ mod tests {
         spec.event = HookEventName::SessionStart;
         let registry = registry_from_specs(vec![spec]);
         let envelope = session_start_envelope();
-        let results = dispatch_non_blocking(
+        let out = dispatch_non_blocking(
             &registry,
             HookEventName::SessionStart,
             &envelope,
             &run_ctx(),
         )
         .await;
-        assert_eq!(results.len(), 1);
-        assert!(matches!(results[0], HookRunResult::Success { .. }));
+        assert_eq!(out.results.len(), 1);
+        assert!(matches!(out.results[0], HookRunResult::Success { .. }));
+    }
+
+    #[tokio::test]
+    async fn non_blocking_soft_warn_context_collected() {
+        let mut spec = make_command_spec(
+            "auditor",
+            None,
+            true,
+            r#"echo '{"decision":"allow","reason":"slither found reentrancy"}'"#,
+        );
+        spec.event = HookEventName::PostToolUse;
+        let registry = registry_from_specs(vec![spec]);
+        // Envelope payload type is secondary: registry filters by event, matcher is None.
+        let envelope = session_start_envelope();
+        let out =
+            dispatch_non_blocking(&registry, HookEventName::PostToolUse, &envelope, &run_ctx())
+                .await;
+        assert_eq!(out.results.len(), 1);
+        assert!(matches!(out.results[0], HookRunResult::Success { .. }));
+        assert_eq!(
+            out.additional_context.as_deref(),
+            Some("slither found reentrancy")
+        );
     }
 
     #[tokio::test]
@@ -917,16 +970,16 @@ mod tests {
         spec2.event = HookEventName::SessionStart;
         let registry = registry_from_specs(vec![spec1, spec2]);
         let envelope = session_start_envelope();
-        let results = dispatch_non_blocking(
+        let out = dispatch_non_blocking(
             &registry,
             HookEventName::SessionStart,
             &envelope,
             &run_ctx(),
         )
         .await;
-        assert_eq!(results.len(), 2);
-        assert!(matches!(results[0], HookRunResult::Failed { .. }));
-        assert!(matches!(results[1], HookRunResult::Success { .. }));
+        assert_eq!(out.results.len(), 2);
+        assert!(matches!(out.results[0], HookRunResult::Failed { .. }));
+        assert!(matches!(out.results[1], HookRunResult::Success { .. }));
     }
 
     // ── hub_hook_kind tests ──────────────────────────────────────

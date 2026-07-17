@@ -495,7 +495,6 @@ impl SessionActor {
                 .expect("dispatch index should match an approved slot exactly once");
             self.signals_handle().record_tool_call(&prepared.tool_name);
             let tool_start = self.events.tool_started(prepared.tool_name.clone());
-            let mut post_tool_use_result: Option<serde_json::Value> = None;
             if let Some((server, _)) =
                 crate::session::mcp_servers::parse_mcp_tool_name(&prepared.tool_name)
                 && server.starts_with(crate::session::managed_mcp::MANAGED_MCP_PREFIX)
@@ -529,12 +528,49 @@ impl SessionActor {
                         .clone()
                         .or_else(|| prepared.dispatch_target_name.clone())
                         .unwrap_or_else(|| prepared.tool_name.clone());
-                    post_tool_use_result = self
-                        .hook_event_active(xai_grok_hooks::event::HookEventName::PostToolUse)
-                        .then(|| {
-                            serde_json::to_value(&tool_result.output)
-                                .unwrap_or(serde_json::Value::Null)
-                        });
+                    // PostToolUse 在写 tool_result 之前跑: soft-warn 才能并入模型可见文本
+                    // (原先 fire-and-forget, rules_engine 审计输出被整段丢弃).
+                    let mut merged_hook_ctx = prepared.pre_tool_hook_context.clone();
+                    if self.hook_event_active(xai_grok_hooks::event::HookEventName::PostToolUse) {
+                        let tool_result_value = serde_json::to_value(&tool_result.output)
+                            .unwrap_or(serde_json::Value::Null);
+                        let raw_input: serde_json::Value =
+                            serde_json::from_str(&prepared.raw_arguments)
+                                .unwrap_or(serde_json::Value::Null);
+                        let (tool_input_value, tool_input_truncated) =
+                            xai_grok_hooks::event::truncate_payload(raw_input);
+                        let (tool_result_val, tool_result_truncated) =
+                            xai_grok_hooks::event::truncate_payload(tool_result_value);
+                        let hook_tool_name = prepared.hook_tool_name();
+                        if let Some(post_ctx) = self
+                            .dispatch_hook(
+                                xai_grok_hooks::event::HookEventName::PostToolUse,
+                                xai_grok_hooks::event::HookPayload::PostToolUse {
+                                    tool_name: hook_tool_name.to_owned(),
+                                    tool_use_id: prepared.call_id.clone(),
+                                    tool_input: tool_input_value,
+                                    tool_result: tool_result_val,
+                                    tool_input_truncated,
+                                    tool_result_truncated,
+                                    duration_ms: None,
+                                    is_backgrounded: false,
+                                    subagent_type: self.subagent_type_label(),
+                                },
+                                None,
+                                Some(hook_tool_name),
+                            )
+                            .await
+                        {
+                            self.send_hook_annotation(&format!(
+                                "\u{26a0} `{hook_tool_name}` warned by post_tool_use hook: {post_ctx}"
+                            ))
+                            .await;
+                            merged_hook_ctx = Some(match merged_hook_ctx {
+                                Some(pre) => format!("{pre}\n\n{post_ctx}"),
+                                None => post_ctx,
+                            });
+                        }
+                    }
                     let followups = self
                         .handle_bridge_tool_success(
                             &prepared.tool_call_id,
@@ -545,7 +581,7 @@ impl SessionActor {
                             prepared.concatenated_json_count,
                             &prepared.model_id,
                             &prepared.parsed_args,
-                            prepared.pre_tool_hook_context.as_deref(),
+                            merged_hook_ctx.as_deref(),
                         )
                         .await?;
                     deferred_followups.extend(followups);
@@ -578,20 +614,21 @@ impl SessionActor {
                         let (tool_input_value, tool_input_truncated) =
                             xai_grok_hooks::event::truncate_payload(raw_input);
                         let hook_tool_name = prepared.hook_tool_name();
-                        self.dispatch_hook(
-                            xai_grok_hooks::event::HookEventName::PostToolUseFailure,
-                            xai_grok_hooks::event::HookPayload::PostToolUseFailure {
-                                tool_name: hook_tool_name.to_owned(),
-                                tool_use_id: prepared.call_id.clone(),
-                                tool_input: tool_input_value,
-                                tool_input_truncated,
-                                error: format!("{err:#}"),
-                                subagent_type: self.subagent_type_label(),
-                            },
-                            None,
-                            Some(hook_tool_name),
-                        )
-                        .await;
+                        let _ = self
+                            .dispatch_hook(
+                                xai_grok_hooks::event::HookEventName::PostToolUseFailure,
+                                xai_grok_hooks::event::HookPayload::PostToolUseFailure {
+                                    tool_name: hook_tool_name.to_owned(),
+                                    tool_use_id: prepared.call_id.clone(),
+                                    tool_input: tool_input_value,
+                                    tool_input_truncated,
+                                    error: format!("{err:#}"),
+                                    subagent_type: self.subagent_type_label(),
+                                },
+                                None,
+                                Some(hook_tool_name),
+                            )
+                            .await;
                     }
                     ToolLoop::Continue
                 }
@@ -606,32 +643,6 @@ impl SessionActor {
                         self.send_available_commands_update().await;
                     }
                 }
-            }
-            if let Some(tool_result_value) = post_tool_use_result {
-                let raw_input: serde_json::Value = serde_json::from_str(&prepared.raw_arguments)
-                    .unwrap_or(serde_json::Value::Null);
-                let (tool_input_value, tool_input_truncated) =
-                    xai_grok_hooks::event::truncate_payload(raw_input);
-                let (tool_result_val, tool_result_truncated) =
-                    xai_grok_hooks::event::truncate_payload(tool_result_value);
-                let hook_tool_name = prepared.hook_tool_name();
-                self.dispatch_hook(
-                    xai_grok_hooks::event::HookEventName::PostToolUse,
-                    xai_grok_hooks::event::HookPayload::PostToolUse {
-                        tool_name: hook_tool_name.to_owned(),
-                        tool_use_id: prepared.call_id.clone(),
-                        tool_input: tool_input_value,
-                        tool_result: tool_result_val,
-                        tool_input_truncated,
-                        tool_result_truncated,
-                        duration_ms: None,
-                        is_backgrounded: false,
-                        subagent_type: self.subagent_type_label(),
-                    },
-                    None,
-                    Some(hook_tool_name),
-                )
-                .await;
             }
             self.events.tool_finished();
             let tool_outcome = match &tool_loop {
@@ -963,9 +974,7 @@ impl SessionActor {
                             )
                             .await?));
                     }
-                    xai_grok_hooks::result::HookDecision::Allow {
-                        additional_context,
-                    } => {
+                    xai_grok_hooks::result::HookDecision::Allow { additional_context } => {
                         if let Some(ctx) = additional_context {
                             // Soft warn: tool still runs; context is attached to
                             // PreparedToolCall and prepended to tool_result so the

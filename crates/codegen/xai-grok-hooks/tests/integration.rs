@@ -269,7 +269,7 @@ async fn non_blocking_dispatch() {
         workspace_root: dir.path().to_str().unwrap(),
     };
 
-    let results = dispatcher::dispatch_non_blocking(
+    let out = dispatcher::dispatch_non_blocking(
         &registry,
         HookEventName::SessionStart,
         &session_start_envelope(),
@@ -277,9 +277,9 @@ async fn non_blocking_dispatch() {
     )
     .await;
 
-    assert_eq!(results.len(), 1);
+    assert_eq!(out.results.len(), 1);
     assert!(matches!(
-        &results[0],
+        &out.results[0],
         xai_grok_hooks::result::HookRunResult::Success { .. }
     ));
 }
@@ -531,24 +531,24 @@ async fn new_event_types_fire_and_receive_correct_envelope() {
             workspace_root: dir.path().to_str().unwrap(),
         };
 
-        let results =
+        let out =
             dispatcher::dispatch_non_blocking(&registry, case.event_name, &envelope, &ctx).await;
 
         assert_eq!(
-            results.len(),
+            out.results.len(),
             1,
             "{}: expected 1 result, got {}",
             case.json_key,
-            results.len()
+            out.results.len()
         );
         assert!(
             matches!(
-                &results[0],
+                &out.results[0],
                 xai_grok_hooks::result::HookRunResult::Success { .. }
             ),
             "{}: hook did not succeed: {:?}",
             case.json_key,
-            results[0]
+            out.results[0]
         );
 
         let raw = std::fs::read_to_string(&output_file)

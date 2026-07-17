@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use tokio::io::AsyncWriteExt;
 
 use crate::config::HookSpec;
-use crate::decision_parse::{parse_hook_json, ParseHookJson};
+use crate::decision_parse::{ParseHookJson, parse_hook_json};
 use crate::event::HookEventEnvelope;
 use crate::result::HookDecision;
 
@@ -239,8 +239,18 @@ pub async fn run_command_hook(
             );
 
             if !is_blocking {
+                // PostToolUse 等非阻塞事件: 仍解析 soft-warn JSON, 否则
+                // rules_engine / hookify 的 allow+reason 会被整段丢弃, 模型看不到审计.
                 if exit_code == 0 {
-                    return (HookRunnerResult::Success, elapsed);
+                    match crate::decision_parse::parse_hook_json(&stdout, &spec.name) {
+                        crate::decision_parse::ParseHookJson::Decision(decision) => {
+                            if decision.additional_context().is_some() || decision.is_deny() {
+                                return (HookRunnerResult::Decision(decision), elapsed);
+                            }
+                            return (HookRunnerResult::Success, elapsed);
+                        }
+                        _ => return (HookRunnerResult::Success, elapsed),
+                    }
                 }
                 return (
                     HookRunnerResult::Failed(format!("exit code {exit_code}")),
@@ -435,10 +445,7 @@ fn parse_blocking_result(
 ) -> (HookRunnerResult, Duration) {
     match parse_hook_json(stdout, hook_name) {
         ParseHookJson::Decision(decision) => {
-            if decision.is_deny()
-                && exit_code != DENY_EXIT_CODE
-                && exit_code != 0
-            {
+            if decision.is_deny() && exit_code != DENY_EXIT_CODE && exit_code != 0 {
                 tracing::warn!(
                     hook_name,
                     exit_code,
@@ -532,7 +539,8 @@ mod tests {
 
     #[test]
     fn parse_claude_warn_json() {
-        let body = r#"{"hookSpecificOutput":{"additionalContext":"prefer scrape"},"systemMessage":"w"}"#;
+        let body =
+            r#"{"hookSpecificOutput":{"additionalContext":"prefer scrape"},"systemMessage":"w"}"#;
         let (result, _) = parse_blocking_result(body, 0, "hookify", Duration::ZERO);
         match result {
             HookRunnerResult::Decision(HookDecision::Allow {

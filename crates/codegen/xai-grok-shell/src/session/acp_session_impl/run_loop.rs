@@ -224,17 +224,13 @@ pub(super) async fn run_session(
             xai_grok_hooks::event::HookPayload::SessionEnd { reason : "channel_closed"
             .to_string(), turn_count : None, tool_call_count : None, },); if let
             Some(registry) = session.hook_registry.borrow().clone() { let ctx = session
-            .hook_run_ctx(); let results =
-            xai_grok_hooks::dispatcher::dispatch_non_blocking(& registry,
-            xai_grok_hooks::event::HookEventName::SessionEnd, & envelope, & ctx,). await;
-            session.send_hook_execution("session_end", None, None, & results). await; }
+            .hook_run_ctx(); let hook_out = xai_grok_hooks::dispatcher::dispatch_non_blocking(& registry,
+            xai_grok_hooks::event::HookEventName::SessionEnd, & envelope, & ctx,). await; session.send_hook_execution("session_end", None, None, & hook_out.results). await; }
             let envelope = session.fire_hook(xai_grok_hooks::event::HookEventName::Stop,
             None, xai_grok_hooks::event::HookPayload::Stop { reason : "channel_closed"
             .to_string(), },); if let Some(registry) = session.hook_registry.borrow()
-            .clone() { let ctx = session.hook_run_ctx(); let results =
-            xai_grok_hooks::dispatcher::dispatch_non_blocking(& registry,
-            xai_grok_hooks::event::HookEventName::Stop, & envelope, & ctx,). await;
-            session.send_hook_execution("stop", None, None, & results). await; } let mut
+            .clone() { let ctx = session.hook_run_ctx(); let hook_out = xai_grok_hooks::dispatcher::dispatch_non_blocking(& registry,
+            xai_grok_hooks::event::HookEventName::Stop, & envelope, & ctx,). await; session.send_hook_execution("stop", None, None, & hook_out.results). await; } let mut
             session_end_result = "disabled"; let mut total_chunks_at_end = 0usize; if !
             session.startup_hints.is_subagent { if let Some(storage) = session.memory
             .storage() { let conversation = session.chat_state_handle.get_conversation().
@@ -689,10 +685,9 @@ pub(super) async fn run_session(
             session.fire_hook(xai_grok_hooks::event::HookEventName::SessionStart, None,
             xai_grok_hooks::event::HookPayload::SessionStart { source, model_id : None,
             agent_type : None, },); if let Some(registry) = session.hook_registry
-            .borrow().clone() { let ctx = session.hook_run_ctx(); let results =
-            xai_grok_hooks::dispatcher::dispatch_non_blocking(& registry,
+            .borrow().clone() { let ctx = session.hook_run_ctx(); let hook_out = xai_grok_hooks::dispatcher::dispatch_non_blocking(& registry,
             xai_grok_hooks::event::HookEventName::SessionStart, & envelope, & ctx,).
-            await; session.send_hook_execution("session_start", None, None, & results).
+            await; session.send_hook_execution("session_start", None, None, & hook_out.results).
             await; } } SessionCommand::GetFeedbackContext { turn_number, responds_to } =>
             { let s = session.clone(); tokio::task::spawn_local(async move { use
             prod_mc_cli_chat_proxy_types::feedback_types::FeedbackToolOutcome; let
@@ -776,17 +771,14 @@ pub(super) async fn run_session(
             xai_grok_hooks::event::HookPayload::SessionEnd { reason : "shutdown"
             .to_string(), turn_count : None, tool_call_count : None, },); if let
             Some(registry) = session.hook_registry.borrow().clone() { let ctx = session
-            .hook_run_ctx(); let results =
+            .hook_run_ctx(); let hook_out =
             xai_grok_hooks::dispatcher::dispatch_non_blocking(& registry,
-            xai_grok_hooks::event::HookEventName::SessionEnd, & envelope, & ctx,). await;
-            session.send_hook_execution("session_end", None, None, & results). await; }
+            xai_grok_hooks::event::HookEventName::SessionEnd, & envelope, & ctx,). await; session.send_hook_execution("session_end", None, None, & hook_out.results). await; }
             let envelope = session.fire_hook(xai_grok_hooks::event::HookEventName::Stop,
             None, xai_grok_hooks::event::HookPayload::Stop { reason : "shutdown"
             .to_string(), },); if let Some(registry) = session.hook_registry.borrow()
-            .clone() { let ctx = session.hook_run_ctx(); let results =
-            xai_grok_hooks::dispatcher::dispatch_non_blocking(& registry,
-            xai_grok_hooks::event::HookEventName::Stop, & envelope, & ctx,). await;
-            session.send_hook_execution("stop", None, None, & results). await; } let mut
+            .clone() { let ctx = session.hook_run_ctx(); let hook_out = xai_grok_hooks::dispatcher::dispatch_non_blocking(& registry,
+            xai_grok_hooks::event::HookEventName::Stop, & envelope, & ctx,). await; session.send_hook_execution("stop", None, None, & hook_out.results). await; } let mut
             session_end_result = "disabled"; let mut total_chunks_at_end = 0usize; if !
             session.startup_hints.is_subagent { if let Some(storage) = session.memory
             .storage() { let conversation = session.chat_state_handle.get_conversation().

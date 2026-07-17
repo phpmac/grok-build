@@ -1,12 +1,12 @@
 {
-  "description": "Claude Code hookify 规则兼容",
+  "description": "Claude Code hookify 规则兼容 (真源在项目, 全局软链)",
   "hooks": {
     "PreToolUse": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .grok/hooks/scripts/rules_engine.py pre",
+            "command": "python3 /Users/a/.grok/hooks/scripts/rules_engine.py pre",
             "timeout": 30
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .grok/hooks/scripts/rules_engine.py post",
+            "command": "python3 /Users/a/.grok/hooks/scripts/rules_engine.py post",
             "timeout": 120
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .grok/hooks/scripts/rules_engine.py stop",
+            "command": "python3 /Users/a/.grok/hooks/scripts/rules_engine.py stop",
             "timeout": 15
           }
         ]

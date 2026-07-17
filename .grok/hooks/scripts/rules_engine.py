@@ -404,7 +404,9 @@ def _normalize(data: Dict[str, Any], stage: str) -> Dict[str, Any]:
         "stop": "Stop",
     }
     he = he_map.get(raw.lower(), raw if raw[:1].isupper() else raw)
-    return {"tool_name": name, "tool_input": tin, "hook_event_name": he, **data}
+    # 先展开 envelope, 再用规范化字段覆盖 — 禁止 **data 盖掉 alias 后的 tool_name
+    out = {**data, "tool_name": name, "tool_input": tin, "hook_event_name": he}
+    return out
 
 
 def _allowed_stage(rule: Rule, hook_event: str) -> bool:
