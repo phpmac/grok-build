@@ -11,14 +11,13 @@ cargo run -p xai-grok-pager-bin
 # 发布构建
 cargo build -p xai-grok-pager-bin --release
 ./target/release/xai-grok-pager
-```
 
-可选:
-
-```sh
+# 可选
 cp target/release/xai-grok-pager ~/.local/bin/grok
 grok
 ```
+
+Mac 上若 SIGKILL: `xattr -cr ~/.local/bin/grok`
 
 ## 配置
 
@@ -39,3 +38,4 @@ language = "简体中文"    # 沟通/标题/commit 等生成文案语言; 也�
 git tag v0.1.0
 git push origin v0.1.0
 ```
+
