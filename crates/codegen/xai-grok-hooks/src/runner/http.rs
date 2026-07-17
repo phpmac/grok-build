@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use url::Url;
 
 use crate::config::HookSpec;
-use crate::decision_parse::{parse_hook_json, ParseHookJson};
+use crate::decision_parse::{ParseHookJson, parse_hook_json};
 use crate::event::HookEventEnvelope;
 use crate::result::{HookDecision, HttpInfo};
 
@@ -331,7 +331,9 @@ fn parse_http_blocking_result(
         )),
         ParseHookJson::Empty => {
             if status.is_success() {
-                HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
+                HookRunnerResult::Decision(HookDecision::Allow {
+                    additional_context: None,
+                })
             } else {
                 HookRunnerResult::Failed(format!("HTTP status {} with empty body", status))
             }
@@ -342,7 +344,9 @@ fn parse_http_blocking_result(
                     hook_name = %hook_name,
                     "could not parse HTTP hook response JSON, treating as allow"
                 );
-                HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
+                HookRunnerResult::Decision(HookDecision::Allow {
+                    additional_context: None,
+                })
             } else {
                 HookRunnerResult::Failed(format!(
                     "HTTP status {} and failed to parse response body",
@@ -388,7 +392,9 @@ mod tests {
             parse_http_blocking_result(r#"{"decision":"allow"}"#, StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: None
+            })
         ));
     }
 
@@ -441,7 +447,9 @@ mod tests {
         let result = parse_http_blocking_result("", StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: None
+            })
         ));
     }
 
@@ -450,7 +458,9 @@ mod tests {
         let result = parse_http_blocking_result("   \n  ", StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: None
+            })
         ));
     }
 
@@ -472,7 +482,9 @@ mod tests {
         let result = parse_http_blocking_result("not json at all", StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: None
+            })
         ));
     }
 
@@ -513,7 +525,9 @@ mod tests {
         );
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: None
+            })
         ));
     }
 
@@ -523,7 +537,9 @@ mod tests {
             parse_http_blocking_result(r#"{"decision":"deny""#, StatusCode::OK, "test-hook");
         assert!(matches!(
             result,
-            HookRunnerResult::Decision(HookDecision::Allow { additional_context: None })
+            HookRunnerResult::Decision(HookDecision::Allow {
+                additional_context: None
+            })
         ));
     }
 

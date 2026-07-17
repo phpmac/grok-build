@@ -170,8 +170,7 @@ pub async fn construct_user_message(
         tracing::debug!(elapsed_ms = elapsed_ms as u64, "startup: user_prefix");
         block
     };
-    let mut user_info =
-        construct_user_message_minimal(working_directory, override_info, language);
+    let mut user_info = construct_user_message_minimal(working_directory, override_info, language);
     if let Some(vcs) = vcs_block {
         user_info.push_str(&vcs);
     }

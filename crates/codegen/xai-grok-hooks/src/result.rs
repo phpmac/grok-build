@@ -7,9 +7,7 @@ pub enum HookDecision {
     ///
     /// `additional_context` is optional soft-warn text that must reach the
     /// model while still executing the tool (Claude Code / hookify `warn`).
-    Allow {
-        additional_context: Option<String>,
-    },
+    Allow { additional_context: Option<String> },
     /// At least one hook denied with the given reason (tool must not run).
     Deny { reason: String, hook_name: String },
 }

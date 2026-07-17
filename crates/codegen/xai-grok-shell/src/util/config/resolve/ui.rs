@@ -12,7 +12,8 @@ pub const ENV_LANGUAGE: &str = "GROK_LANGUAGE";
 /// Accepts the util-layer `Config` returned by [`crate::util::config::load_config`].
 pub fn resolve_language(cfg: &crate::util::config::Config) -> Option<String> {
     let from_env = std::env::var(ENV_LANGUAGE).ok();
-    normalize_language(from_env.as_deref()).or_else(|| normalize_language(cfg.ui.language.as_deref()))
+    normalize_language(from_env.as_deref())
+        .or_else(|| normalize_language(cfg.ui.language.as_deref()))
 }
 
 /// Trim and drop empty language values.

@@ -121,7 +121,9 @@ Just generate the session_title and nothing else"#
     .with_model(model)
     .with_tools(vec![ToolSpec {
         name: "session_title".to_owned(),
-        description: Some("Generate the session_title which we use for the user_message".to_owned()),
+        description: Some(
+            "Generate the session_title which we use for the user_message".to_owned(),
+        ),
         parameters: serde_json::json!({
             "type": "object",
             "required": ["session_title"],

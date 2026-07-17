@@ -118,10 +118,7 @@ fn classify_flexible(output: FlexibleHookOutput, hook_name: &str) -> ParseHookJs
     if let Some(ctx) = context {
         // Known allow-ish decisions or no decision (Claude warn shape).
         if decision.is_none()
-            || matches!(
-                decision,
-                Some("allow") | Some("continue") | Some("approve")
-            )
+            || matches!(decision, Some("allow") | Some("continue") | Some("approve"))
             || permission.is_some()
         {
             return ParseHookJson::Decision(HookDecision::allow_with_context(ctx));
@@ -241,10 +238,7 @@ mod tests {
 
     #[test]
     fn parse_allow_with_reason_is_soft_warn() {
-        let d = match parse_hook_json(
-            r#"{"decision":"allow","reason":"consider using rg"}"#,
-            "h",
-        ) {
+        let d = match parse_hook_json(r#"{"decision":"allow","reason":"consider using rg"}"#, "h") {
             ParseHookJson::Decision(d) => d,
             other => panic!("{other:?}"),
         };
@@ -264,10 +258,7 @@ mod tests {
     fn empty_and_invalid() {
         assert_eq!(parse_hook_json("", "h"), ParseHookJson::Empty);
         assert_eq!(parse_hook_json("   ", "h"), ParseHookJson::Empty);
-        assert_eq!(
-            parse_hook_json("not-json", "h"),
-            ParseHookJson::InvalidJson
-        );
+        assert_eq!(parse_hook_json("not-json", "h"), ParseHookJson::InvalidJson);
     }
 
     #[test]
