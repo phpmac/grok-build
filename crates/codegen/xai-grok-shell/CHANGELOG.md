@@ -1,5 +1,17 @@
 # Changelog
 
+# 1.0.0 — 2026-07-17
+
+## Features
+
+- **PostToolUse soft-warn** now reaches the model and UI (slither/sg and other post-write audits).
+- **Project hook source of truth** under `.grok/hooks/` with global symlink install one-liner.
+
+## Bug Fixes
+
+- **Non-blocking hooks** no longer drop allow+reason JSON (audit output was discarded).
+- **rules_engine** tool name alias is not overwritten by envelope fields (`write` matches Write|Edit).
+
 # 0.2.101 — 2026-07-13
 
 ## Features
