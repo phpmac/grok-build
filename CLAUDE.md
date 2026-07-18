@@ -28,4 +28,30 @@
 - Release 正文只写本次变更说明, 禁止列 assets 产物清单 (CI 上传什么用户自己看得到, 列出来是废话)
 - Release 不生成/不上传 `*.sha256` 校验文件, 多余
 - tag `v*` 推送后由 CI 构建多平台二进制并自动上传 tar.gz 到 Release
+- 本地发行版本与上游 monorepo 版本号分离: 本仓产品版本 (如 1.1.0) 独立递增; 上游锁步号与 `SOURCE_REV` 仅作同步记录
+
+## 上游同步 (设计保留)
+
+同步 `upstream/main` (xai-org/grok-build) 时, **以下本地设计默认保留**, 不得被上游 diff 覆盖:
+
+| 设计 | 落点 | 策略 |
+|------|------|------|
+| 启动禁用官方自动更新 | `pager-bin` `should_check_for_updates` 恒 false; `auto_update::run_update_if_available` / background check 本地 noop | 启动不检查不下载; 手动 `grok update` 路径可另议 |
+| 启动 UI 精简 | `local_ui::{suppress_announcements,suppress_changelog,suppress_logo}` | 非 test 构建隐藏公告/changelog/点阵 logo |
+| Hook soft-warn / hookify | `xai-grok-hooks` decision_parse/dispatcher/result; PostToolUse 回传模型 | block 拦, warn 放行并让模型读到提示 |
+| `[ui].language` / `GROK_LANGUAGE` | shared ui_config + shell resolve/user_message/prompt | 沟通/标题/commit 等生成文案语言 |
+| Tasks 面板位置 | `views/agent.rs` 布局: scrollback 下, prompt 上 | 不跟上游若改回顶部 |
+| 会话标题左对齐 | `prompt_widget` 顶边 title | 不跟上游若改回右对齐 |
+| 移除 Sentry | telemetry 无 sentry 接入 | 不恢复错误上报 SDK |
+| Release CI / README / 本文件 | `.github/workflows/release.yml` 等 | 官方无对等文件时保持本地 |
+
+### 与上游的设计分歧 (不是 merge 打不过, 是长期策略)
+
+1. **自动更新**: 上游启动可检查/可装; 本地发行启动路径硬关. 合入后复查 `auto_update.rs` 与 `main.rs` 门控是否仍短路.
+2. **版本号**: 上游如 0.2.102; 本地用 1.x 发行号. Changelog 可同时收录上游段落与本地 1.x 段落.
+3. **欢迎 Changelog UI**: 上游写 release notes 文案; 本地 `suppress_changelog` 仍隐藏展示, 文案可进仓库.
+
+### 无冲突可直接吃进的上游能力 (示例 0.2.102)
+
+`/jump` `/timeline`, bash Tab 补全, 编辑折叠, 登录/权限稳定性, minimal 作用域仅当前 session, 大量 bugfix. 与上表正交.
 

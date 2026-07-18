@@ -55,6 +55,8 @@ pub mod startup;
 pub mod tips;
 pub mod wrap_clipboard_image;
 pub mod wrap_cmd;
+pub(crate) mod wrap_filter;
+pub(crate) mod wrap_restore;
 
 pub mod tool_usage;
 
