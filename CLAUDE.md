@@ -55,3 +55,29 @@
 
 `/jump` `/timeline`, bash Tab 补全, 编辑折叠, 登录/权限稳定性, minimal 作用域仅当前 session, 大量 bugfix. 与上表正交.
 
+## 本地 fork 回归测试 (合并上游后必跑)
+
+防止官方 diff 冲掉 soft-warn / hookify / 启动门控. 合并 `upstream` 后至少跑:
+
+```sh
+# Hook 协议 + 规则引擎 fixture (中文标点 warn, github 禁爬虫/curl, gh 放行)
+cargo test -p xai-grok-hooks local_fork
+
+# soft-warn 调度与 JSON 解析
+cargo test -p xai-grok-hooks soft_warn
+cargo test -p xai-grok-hooks parse_allow_with_reason
+
+# 启动关自动更新
+cargo test -p xai-grok-pager-bin should_check_for_updates
+
+# 启动 UI 门控 (cfg(test) 下不 suppress, 保护上游 layout 单测)
+cargo test -p xai-grok-pager local_ui
+
+# 也可直接跑 Python 自测
+python3 .grok/hooks/scripts/rules_engine.py --self-test
+python3 crates/codegen/xai-grok-hooks/examples/hooks/bin/chinese-punctuation-warn.py --self-test
+```
+
+规则 fixture 真源: `.grok/hooks/fixtures/rules/hookify.*.local.md` (不依赖本机 `~/.claude`).
+Rust 入口: `crates/codegen/xai-grok-hooks/src/local_fork_regression.rs`.
+

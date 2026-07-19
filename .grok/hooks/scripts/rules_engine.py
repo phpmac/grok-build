@@ -214,10 +214,11 @@ def _rule_from_fm(fm: Dict[str, Any], message: str) -> Optional[Rule]:
     )
 
 
-def load_rules() -> List[Rule]:
+def load_rules_from_dirs(dirs: List[Path]) -> List[Rule]:
+    """从指定目录加载 hookify.*.local.md (测试可注入 fixture, 不依赖 ~/.claude)."""
     files: List[str] = []
     seen = set()
-    for d in _claude_rule_dirs():
+    for d in dirs:
         for path in glob.glob(str(d / "hookify.*.local.md")):
             if not os.path.isfile(path):
                 continue
@@ -241,6 +242,205 @@ def load_rules() -> List[Rule]:
         if rule and rule.enabled:
             rules.append(rule)
     return rules
+
+
+def load_rules() -> List[Rule]:
+    return load_rules_from_dirs(_claude_rule_dirs())
+
+
+def _fixture_rules_dir() -> Path:
+    # .grok/hooks/scripts/rules_engine.py -> fixtures/rules
+    return Path(__file__).resolve().parent.parent / "fixtures" / "rules"
+
+
+def self_test() -> int:
+    """回归: 中文标点 soft-warn / GitHub 禁爬虫与 curl / gh 放行.
+
+    用仓库内 fixture 规则, 不依赖本机 ~/.claude, 防止上游合并冲掉协议语义.
+    """
+    fixture = _fixture_rules_dir()
+    if not fixture.is_dir():
+        print(f"FAIL missing fixture dir: {fixture}")
+        return 1
+    rules = load_rules_from_dirs([fixture])
+    names = {r.name for r in rules}
+    required = {
+        "warn-chinese-punctuation",
+        "block-github-via-scraper",
+        "block-curl-github",
+    }
+    missing = required - names
+    if missing:
+        print(f"FAIL missing fixture rules: {sorted(missing)}")
+        return 1
+
+    failures = 0
+
+    def check(label: str, stage: str, envelope: Dict[str, Any], expect: str) -> None:
+        nonlocal failures
+        data = _normalize(envelope, stage)
+        result = evaluate(rules, data)
+        decision = result.get("decision")
+        if expect == "silent":
+            if result:
+                failures += 1
+                print(f"FAIL {label}: want silent, got {result}")
+            return
+        if decision != expect:
+            failures += 1
+            print(f"FAIL {label}: want decision={expect}, got {result}")
+            return
+        if expect == "allow":
+            if not result.get("reason"):
+                failures += 1
+                print(f"FAIL {label}: allow without reason")
+            hso = result.get("hookSpecificOutput") or {}
+            if not hso.get("additionalContext"):
+                failures += 1
+                print(f"FAIL {label}: allow missing additionalContext")
+        if expect == "deny":
+            reason = str(result.get("reason") or "")
+            if "拦截" not in reason and "block" not in reason.lower():
+                # rules_engine uses [拦截]
+                if not reason:
+                    failures += 1
+                    print(f"FAIL {label}: deny without reason")
+
+    # --- 中文标点: soft-warn 放行 ---
+    check(
+        "punct_write_hit",
+        "pre",
+        {
+            "hookEventName": "PreToolUse",
+            "toolName": "write",
+            "toolInput": {
+                "file_path": "/tmp/t.md",
+                "content": "你好，世界。",
+            },
+        },
+        "allow",
+    )
+    check(
+        "punct_write_ok",
+        "pre",
+        {
+            "hookEventName": "PreToolUse",
+            "toolName": "write",
+            "toolInput": {
+                "file_path": "/tmp/t.md",
+                "content": "hello, world.",
+            },
+        },
+        "silent",
+    )
+    check(
+        "punct_edit_hit",
+        "pre",
+        {
+            "toolName": "search_replace",
+            "toolInput": {
+                "file_path": "a.rs",
+                "old_string": "x",
+                "new_string": "注释：错误标点",
+            },
+        },
+        "allow",
+    )
+    # 中文汉字 + 英文标点: 不 warn
+    check(
+        "punct_chinese_with_english_punct",
+        "pre",
+        {
+            "toolName": "write",
+            "toolInput": {
+                "file_path": "a.md",
+                "content": "注释: 使用英文标点",
+            },
+        },
+        "silent",
+    )
+
+    # --- GitHub 必须用 gh: 爬虫 MCP 拦截 ---
+    check(
+        "github_firecrawl_block",
+        "pre",
+        {
+            "toolName": "firecrawl__scrape",
+            "toolInput": {"url": "https://github.com/xai-org/grok-build"},
+        },
+        "deny",
+    )
+    check(
+        "github_jina_block",
+        "pre",
+        {
+            "toolName": "jina__read_url",
+            "toolInput": {"url": "https://raw.githubusercontent.com/a/b/main/README.md"},
+        },
+        "deny",
+    )
+    # 非 github 目标: 爬虫不因本规则拦截
+    check(
+        "firecrawl_non_github_silent",
+        "pre",
+        {
+            "toolName": "firecrawl__scrape",
+            "toolInput": {"url": "https://example.com/docs"},
+        },
+        "silent",
+    )
+    # gh 命令: 放行 (本规则不匹配 bash)
+    check(
+        "gh_command_silent",
+        "pre",
+        {
+            "toolName": "run_terminal_command",
+            "toolInput": {"command": "gh api repos/xai-org/grok-build"},
+        },
+        "silent",
+    )
+
+    # --- curl 访问 github 拦截; 非 github curl 不拦 ---
+    check(
+        "curl_github_block",
+        "pre",
+        {
+            "toolName": "run_terminal_command",
+            "toolInput": {
+                "command": "curl -sL https://github.com/xai-org/grok-build/archive/main.tar.gz"
+            },
+        },
+        "deny",
+    )
+    check(
+        "curl_localhost_silent",
+        "pre",
+        {
+            "toolName": "run_terminal_command",
+            "toolInput": {"command": "curl -s http://127.0.0.1:8080/health"},
+        },
+        "silent",
+    )
+
+    # --- 工具别名: use_tool 嵌套 + Write 别名 ---
+    check(
+        "use_tool_nested_github_scraper",
+        "pre",
+        {
+            "toolName": "use_tool",
+            "toolInput": {
+                "tool_name": "exa__search",
+                "tool_input": {"query": "site:github.com grok-build"},
+            },
+        },
+        "deny",
+    )
+
+    total = 12
+    # count checks dynamically via failures only; print summary
+    passed_msg = "passed" if failures == 0 else "FAILED"
+    print(f"rules_engine self-test: {passed_msg} (failures={failures}, fixtures={sorted(names)})")
+    return 1 if failures else 0
 
 
 def _collect_text(obj: Any) -> str:
@@ -544,6 +744,8 @@ def evaluate(rules: List[Rule], data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def main(argv: List[str]) -> int:
+    if len(argv) > 1 and argv[1] in ("--self-test", "self-test"):
+        return self_test()
     stage = (argv[1] if len(argv) > 1 else "pre").lower().strip()
     raw = sys.stdin.read()
     if not raw.strip():

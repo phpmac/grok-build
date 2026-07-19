@@ -18,3 +18,16 @@ pub fn suppress_changelog() -> bool {
 pub fn suppress_logo() -> bool {
     !cfg!(test)
 }
+
+#[cfg(test)]
+mod tests {
+    // 在 `cfg(test)` 下三门控必须为 false, 否则上游 layout 单测被本地 fork 误伤.
+    // 生产二进制里它们为 true (见非 test 构建). 合并上游后若改掉 cfg 语义会挂这里.
+
+    #[test]
+    fn test_cfg_does_not_suppress_promo_chrome() {
+        assert!(!super::suppress_announcements());
+        assert!(!super::suppress_changelog());
+        assert!(!super::suppress_logo());
+    }
+}

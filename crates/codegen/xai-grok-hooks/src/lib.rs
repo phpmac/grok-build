@@ -43,6 +43,8 @@ pub mod dispatcher;
 mod env_expand;
 pub mod error;
 pub mod event;
+#[cfg(test)]
+mod local_fork_regression;
 pub mod matcher;
 pub mod result;
 pub mod runner;

@@ -20,3 +20,15 @@ mkdir -p ~/.grok/hooks && ln -sfn (pwd)/.grok/hooks/project-rules.json ~/.grok/h
 - Grok 扫描 `*.json` 时会跟随软链接
 - 全局与项目若加载到同一 command, 会按内容去重, 只跑全局那份
 - 改这里的文件后, 需新开 Grok 会话才生效
+
+## 回归自测
+
+```sh
+# 规则引擎: 中文标点 soft-warn, github 禁爬虫/curl, gh 放行 (用 fixtures/rules)
+python3 .grok/hooks/scripts/rules_engine.py --self-test
+
+# 也可经 cargo 锁协议 + 脚本 (合并上游后必跑)
+cargo test -p xai-grok-hooks local_fork
+```
+
+fixture 目录: `fixtures/rules/` (仓库内固定规则副本, 不依赖 `~/.claude`).
