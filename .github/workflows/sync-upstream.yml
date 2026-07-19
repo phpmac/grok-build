@@ -1,0 +1,151 @@
+# 定时/手动从 xai-org/grok-build 拉官方 main.
+# - 无新提交: 直接结束
+# - 可干净 merge: 推到 main (自动 commit)
+# - 有冲突: 推到 sync/upstream-conflict-<sha> 并开 PR, 不强制合 main
+name: Sync upstream
+
+on:
+  schedule:
+    # 每 6 小时 (UTC)
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge xai-org/grok-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 需要能 push main / 开 PR
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          set -euo pipefail
+          git remote remove upstream 2>/dev/null || true
+          git remote add upstream https://github.com/xai-org/grok-build.git
+          git fetch upstream main
+          git fetch origin main
+
+      - name: Merge or open conflict PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          git checkout main
+          git reset --hard origin/main
+
+          UPSTREAM_SHA="$(git rev-parse upstream/main)"
+          SHORT_SHA="$(git rev-parse --short upstream/main)"
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already contains upstream/main (${SHORT_SHA}); nothing to do."
+            exit 0
+          fi
+
+          echo "Merging upstream/main (${SHORT_SHA}) into main..."
+
+          if git merge --no-edit upstream/main \
+            -m "合并: 自动同步上游 monorepo (${SHORT_SHA})"; then
+            echo "Clean merge; pushing main."
+            git push origin main
+            echo "Pushed main @ $(git rev-parse --short HEAD)"
+            exit 0
+          fi
+
+          echo "Merge conflicts detected; preparing conflict branch + PR."
+          git merge --abort || true
+
+          BRANCH="sync/upstream-conflict-${SHORT_SHA}"
+          # 若分支已存在则复用并硬同步到 origin/main 再 merge 出冲突状态
+          git checkout -B "${BRANCH}" origin/main
+          set +e
+          git merge --no-edit upstream/main \
+            -m "合并: 同步上游 monorepo (${SHORT_SHA}) (有冲突, 待人工)"
+          merge_rc=$?
+          set -e
+
+          if [[ "${merge_rc}" -eq 0 ]]; then
+            # 竞态: 刚才 abort 后干净了
+            git checkout main
+            git reset --hard origin/main
+            git merge --no-edit upstream/main \
+              -m "合并: 自动同步上游 monorepo (${SHORT_SHA})"
+            git push origin main
+            exit 0
+          fi
+
+          # 保留冲突文件状态推上远程, 方便本机 pull 解决
+          # 未解决的 merge 不能直接 commit; 改为记录冲突文件列表到分支说明
+          git merge --abort || true
+          git checkout -B "${BRANCH}" origin/main
+
+          # 生成冲突清单 (不落地冲突内容, 避免半合并仓库)
+          CONFLICT_LIST="$(mktemp)"
+          git merge-tree "$(git merge-base HEAD upstream/main)" HEAD upstream/main \
+            | rg -n 'changed in both|CONFLICT' > "${CONFLICT_LIST}" || true
+
+          {
+            echo "# Upstream sync conflict"
+            echo
+            echo "- upstream: \`xai-org/grok-build@${UPSTREAM_SHA}\`"
+            echo "- local base: \`$(git rev-parse origin/main)\`"
+            echo "- generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            echo "## How to resolve"
+            echo
+            echo '```sh'
+            echo "git fetch upstream"
+            echo "git checkout main"
+            echo "git merge upstream/main"
+            echo "# resolve conflicts, keep local designs (see CLAUDE.md)"
+            echo "cargo test -p xai-grok-hooks local_fork"
+            echo "git commit"
+            echo "git push origin main"
+            echo '```'
+            echo
+            echo "## merge-tree hints"
+            echo
+            echo '```'
+            head -n 200 "${CONFLICT_LIST}" || true
+            echo '```'
+          } > UPSTREAM_SYNC_CONFLICT.md
+
+          git add UPSTREAM_SYNC_CONFLICT.md
+          git commit -m "文档: 上游 ${SHORT_SHA} 同步冲突待处理"
+
+          git push -u origin "${BRANCH}" --force
+
+          # 开 PR (已存在则跳过)
+          if gh pr list --head "${BRANCH}" --state open --json number --jq 'length' | rg -q '^[1-9]'; then
+            echo "PR already open for ${BRANCH}"
+          else
+            gh pr create \
+              --base main \
+              --head "${BRANCH}" \
+              --title "同步上游 monorepo 冲突待处理 (${SHORT_SHA})" \
+              --body "$(cat UPSTREAM_SYNC_CONFLICT.md)"
+          fi
+
+          echo "Conflict PR opened; failing job so schedule is visible."
+          exit 1
