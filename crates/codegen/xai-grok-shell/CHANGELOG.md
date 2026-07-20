@@ -1,5 +1,16 @@
 # Changelog
 
+# 1.3.0 — 2026-07-19
+
+## Features
+
+- **同步上游 monorepo 0.2.106** (`SOURCE_REV` 见 SOURCE_REV 文件): Stop hooks 会话门控, session state/import ACP, scheduler upsert, 剪贴板 OSC52 开关, minimal 语法色等.
+- 本地设计保留不变 (关自动更新 / 启动 UI / soft-warn / language 等).
+
+## Notes
+
+- 产品版本继续走本地 1.x; 上游锁步号仅作同步参考.
+
 # 1.2.0 — 2026-07-19
 
 ## Features
@@ -33,6 +44,18 @@
 
 - **Non-blocking hooks** no longer drop allow+reason JSON (audit output was discarded).
 - **rules_engine** tool name alias is not overwritten by envelope fields (`write` matches Write|Edit).
+# 0.2.106 — 2026-07-18
+
+## Features
+
+- **Added GROK_CLIPBOARD_NO_OSC52** env var to stop clipboard sequences from appearing as garbage in unsupported terminals.
+- **Scheduled tasks** can now be updated in place; one-time tasks are retired in favor of background commands.
+
+## Bug Fixes
+
+- **Copies** now always write a backup file so text remains recoverable when the terminal clipboard fails.
+- **Syntax highlighting** in --minimal mode is now visible on light terminals.
+
 
 # 0.2.105 — 2026-07-18
 
