@@ -80,15 +80,3 @@ python3 crates/codegen/xai-grok-hooks/examples/hooks/bin/chinese-punctuation-war
 
 规则 fixture 真源: `.grok/hooks/fixtures/rules/hookify.*.local.md` (不依赖本机 `~/.claude`).
 Rust 入口: `crates/codegen/xai-grok-hooks/src/local_fork_regression.rs`.
-
-## 自动同步上游 CI
-
-- Workflow: `.github/workflows/sync-upstream.yml`
-- 触发: 每 6 小时 cron + `workflow_dispatch` 手动
-- 行为:
-  - 已包含 `upstream/main`: 无操作
-  - 可干净 merge: 直接 push 到本仓 `main` (github-actions bot commit)
-  - 有冲突: 开 `sync/upstream-conflict-<sha>` PR + `UPSTREAM_SYNC_CONFLICT.md`, job 失败提醒
-- 干净 merge **不会** 自动改本地 1.x 版本号 / 跑发版; 发版仍走 tag `v*` + release.yml
-- 干净 merge 后若动到设计相关文件, 仍应本地跑 `cargo test -p xai-grok-hooks local_fork` 抽查
-
