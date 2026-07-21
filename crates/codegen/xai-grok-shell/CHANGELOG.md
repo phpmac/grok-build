@@ -1,5 +1,16 @@
 # Changelog
 
+# 1.4.0 — 2026-07-22
+
+## Features
+
+- **同步上游 monorepo 0.2.106 续** (`SOURCE_REV` 见 SOURCE_REV 文件): `/feedback` 提交者身份持久化, 自定义模型可用命名 auth provider 轮转 token, minimal 模式完整提交 thinking, no-op bash 结束回合提示, 启动状态含 working tree, durable append 收紧, managed-config 签名 nonce 等.
+- 本地设计保留不变 (关自动更新 / 启动 UI / soft-warn / language 等).
+
+## Notes
+
+- 产品版本继续走本地 1.x; 上游锁步号仍为 0.2.106, 仅 SOURCE_REV 推进.
+
 # 1.3.0 — 2026-07-19
 
 ## Features
