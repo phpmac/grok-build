@@ -1,5 +1,16 @@
 # Changelog
 
+# 1.6.0 — 2026-07-24
+
+## Features
+
+- **同步上游 monorepo 0.2.111** (`SOURCE_REV` 见 SOURCE_REV 文件): `/tutorial` 引导, 按标题 `--resume`, Doctor 可在 TUI 内 fix, privacy banner, 队列行编辑, voice 快捷键开关, toolOverrides, 工作区 relocation, durable scheduler 等 (含 0.2.110).
+- 本地设计保留不变 (关自动更新 / 启动 UI / soft-warn / language 等).
+
+## Notes
+
+- 产品版本继续走本地 1.x; 上游锁步号 0.2.111.
+
 # 1.5.0 — 2026-07-22
 
 ## Features

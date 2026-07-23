@@ -51,9 +51,6 @@ pub fn construct_user_message_minimal(
             )
         }
     };
-    // Local-timezone date, captured when the prefix is built. Re-stamped on
-    // compaction and on resume (build_user_message_prefix), so it stays current
-    // across long sessions.
     let today = chrono::Local::now().format("%Y-%m-%d");
     let language_line = language
         .map(str::trim)
@@ -69,11 +66,14 @@ pub fn construct_user_message_minimal(
 OS Version: {os}
 Shell: {shell}
 Workspace Path: {cwd}
-Today's date: {today}{language_line}
+{USER_INFO_DATE_MARKER} {today}{language_line}
 Note: Prefer using relative paths over absolute paths as tool call args when possible.
 </user_info>"#,
     )
 }
+
+/// Date label in the `<user_info>` prefix; `spawn::resumed_prefix_carries_fallback_date` scans for it.
+pub(crate) const USER_INFO_DATE_MARKER: &str = "Today's date:";
 
 /// Resolve a display string for the user's shell.
 ///
