@@ -18,7 +18,8 @@ jobs:
   build:
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    # x86_64 冷缓存 release 构建 + apt 偶发卡顿; 90min 曾在 Install protoc 被吃光
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
@@ -37,9 +38,25 @@ jobs:
 
       - name: Install protoc (Linux)
         if: runner.os == 'Linux'
+        timeout-minutes: 15
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends protobuf-compiler pkg-config libssl-dev
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          # 重试: 上次 run 卡在 apt-get 近 90min 导致整 job 超时
+          for i in 1 2 3; do
+            if sudo -E apt-get update -y \
+              && sudo -E apt-get install -y --no-install-recommends \
+                protobuf-compiler pkg-config libssl-dev; then
+              break
+            fi
+            echo "apt attempt $i failed; retrying..."
+            sleep 10
+            if [ "$i" -eq 3 ]; then
+              exit 1
+            fi
+          done
+          command -v protoc
+          protoc --version
           echo "PROTOC=$(command -v protoc)" >> "$GITHUB_ENV"
 
       - name: Install protoc (macOS)
