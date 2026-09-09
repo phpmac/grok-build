@@ -1,3 +1,13 @@
+# 1.23.2 - 2026-09-09
+
+## Features
+
+- **同步全局规则到系统提示词 prompt.md**: 新增 research_tools 段 (工具优先级/编码三查/版本以锁文件为准/调研只拿证据); mindset 重写为先读项目再按 research_tools 调研, 禁凭训练数据发明 API/方案; collaboration 增补禁默默换掉用户方案; output_efficiency 增补金字塔/PREP/可执行约束与 skill 长文覆盖禁止.
+
+## Notes
+
+- 产品版本本地 1.x 补丁递增; 无上游同步, SOURCE_REV 不变.
+
 # 1.23.1 - 2026-09-09
 
 ## Features
