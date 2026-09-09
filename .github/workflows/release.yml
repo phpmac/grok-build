@@ -1,4 +1,4 @@
-# 推送 v* tag 时自动构建多平台二进制并创建 GitHub Release
+# 推送 v* tag 时自动构建 macOS (Apple Silicon) 二进制并创建 GitHub Release
 name: Release
 
 on:
@@ -18,46 +18,17 @@ jobs:
   build:
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
-    # x86_64 冷缓存 release 构建 + apt 偶发卡顿; 90min 曾在 Install protoc 被吃光
     timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
         include:
-          # 仅 Apple Silicon (最新 arm mac), 不编 Intel Mac
+          # 仅 Apple Silicon (最新 arm mac)
           - os: macos-14
             target: aarch64-apple-darwin
-          # 服务器: Linux x86_64 (Intel/AMD) + Linux aarch64
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install protoc (Linux)
-        if: runner.os == 'Linux'
-        timeout-minutes: 15
-        run: |
-          set -euo pipefail
-          export DEBIAN_FRONTEND=noninteractive
-          # 重试: 上次 run 卡在 apt-get 近 90min 导致整 job 超时
-          for i in 1 2 3; do
-            if sudo -E apt-get update -y \
-              && sudo -E apt-get install -y --no-install-recommends \
-                protobuf-compiler pkg-config libssl-dev; then
-              break
-            fi
-            echo "apt attempt $i failed; retrying..."
-            sleep 10
-            if [ "$i" -eq 3 ]; then
-              exit 1
-            fi
-          done
-          command -v protoc
-          protoc --version
-          echo "PROTOC=$(command -v protoc)" >> "$GITHUB_ENV"
 
       - name: Install protoc (macOS)
         if: runner.os == 'macOS'
