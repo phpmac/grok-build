@@ -16,7 +16,7 @@ jobs:
           cargo --version
       - name: Generate lockfile
         run: |
-          rm Cargo.lock
+          # 保留现有 pin, 仅按 toml 最小变更 (rm 重解会把全部依赖升到最新)
           cargo generate-lockfile
           # 只 resolve 不编译, 校验产物存在
           test -f Cargo.lock
