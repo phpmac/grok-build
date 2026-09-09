@@ -38,9 +38,14 @@ pub(crate) fn set_current_session_id(id: Option<acp::SessionId>) {
     *CURRENT_SESSION_ID.lock() = id;
 }
 
-/// Lets the signal handler route SIGINT/SIGTERM/SIGHUP into the same graceful
-/// quit as `/exit` (running teardown + history/telemetry flushes) instead of a
-/// hard exit. Registered by the event loop before it starts.
+pub(crate) fn clear_current_session_id_if(session_id: &acp::SessionId) {
+    let mut current = CURRENT_SESSION_ID.lock();
+    if current.as_ref() == Some(session_id) {
+        *current = None;
+    }
+}
+
+/// Lets the signal handler route SIGINT/SIGTERM/SIGHUP into the same graceful quit as `/exit` (running teardown + history/telemetry flushes) instead of a hard exit. Registered by the event loop before it starts.
 static QUIT_NOTIFY: parking_lot::Mutex<Option<std::sync::Arc<tokio::sync::Notify>>> =
     parking_lot::Mutex::new(None);
 
@@ -257,14 +262,17 @@ fn shutdown_with_terminal_restore(exit_code: i32) -> ! {
 /// Shared `-> !` exit tail of `shutdown_with_terminal_restore`'s early-return
 /// and full-teardown paths.
 fn flush_telemetry_and_exit(exit_code: i32) -> ! {
-    // Reap detached (setsid) background children before the hard exit. This tail
-    // runs on the force/second-signal and agent-mode paths that skip the
-    // graceful quit; the graceful path reaps them in `app::run`'s teardown.
-    xai_tty_utils::global_process_scope().kill_all();
-    // Restore fd 2 so OTEL flushes reach the terminal.
-    xai_tty_utils::restore_native_stderr();
-    // 上游新增: 信号退出前上报 status line 指标; 本地无 Sentry, 不调 sentry flush.
-    crate::app::status_line::metrics::global().report_health();
+    {
+        let _exit_span = tracing::info_span!("teardown.process_exit").entered();
+        // Reap detached (setsid) background children before the hard exit. This tail
+        // runs on the force/second-signal and agent-mode paths that skip the
+        // graceful quit; the graceful path reaps them in `app::run`'s teardown.
+        xai_tty_utils::global_process_scope().kill_all();
+        // Restore fd 2 so OTEL flushes reach the terminal.
+        xai_tty_utils::restore_native_stderr();
+        // 上游新增: 信号退出前上报 status line 指标; 本地无 Sentry, 不调 sentry flush.
+        crate::app::status_line::metrics::global().report_health();
+    }
     xai_grok_telemetry::otel_layer::shutdown_otel();
     // Flush the --debug firehose on TUI signal exit (this path bypasses main's flush).
     xai_grok_telemetry::debug_log::flush();
