@@ -329,8 +329,6 @@ impl Default for PagerLocalSnapshot {
             auto_mode_gate: false,
             ask_user_question_timeout_enabled: None,
             voice_stt_language: xai_grok_voice::STT_LANGUAGE_DEFAULT.to_string(),
-            // Matches `resolve_scheduler_background_loops`'s default.
-            scheduler_background_loops: true,
         }
     }
 }
