@@ -1,4 +1,4 @@
-# 临时: 基于上游原版 lock 最小变更生成与本地 toml 一致的 Cargo.lock
+# 临时: 基于上游原版 lock 用 cargo metadata 触发最小变更补丁, 生成与本地 toml 一致的 Cargo.lock
 name: TmpLockgen
 
 on:
@@ -16,19 +16,29 @@ jobs:
           cargo --version
       - name: Reset lockfile to upstream base
         run: |
-          # 本地手改过的 lock 已脏 (大面积重解); 以上游原版 lock 为基底最小变更
           git config --global user.email noreply@xai.com
           git config --global user.name lockgen
           git remote add upstream https://github.com/xai-org/grok-build.git || true
           git fetch upstream main --depth 1
           git show upstream/main:Cargo.lock > Cargo.lock
-      - name: Generate lockfile (minimal delta)
+      - name: Minimal lockfile update via metadata
         run: |
-          cargo generate-lockfile
+          # metadata 在 lock 不满足 toml 时做最小变更补丁 (不同于 generate-lockfile 的全量刷新)
+          cargo metadata --format-version 1 > /dev/null
+          git diff --stat Cargo.lock || true
       - name: Verify lockfile consistency
         run: |
           cargo metadata --locked --format-version 1 > /dev/null
           echo LOCK_CONSISTENT
+      - name: Check rustc compatibility
+        run: |
+          # 构建用 1.94.0; 若 resolve 又拉高版本包, 在此暴露
+          cargo metadata --locked --format-version 1 2>/dev/null | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+vers={p['name']:p['version'] for p in d['packages']}
+print('aws-config', vers.get('aws-config'))
+"
       - name: Upload lockfile
         uses: actions/upload-artifact@v4
         with:
