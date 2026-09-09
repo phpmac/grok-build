@@ -1,0 +1,10 @@
+# 禁残留 git 冲突标记: 合并冲突未解完就提交, tree-sitter 将其解析为 ERROR 节点.
+# 根因: v1.23.0 合并时 event_loop.rs 残留 52 处冲突块未被发现, CI 编译才暴露.
+# 例外: 无; 命中即须回解冲突, 禁止删除标记了事.
+id: rust-conflict-marker
+language: Rust
+rule:
+  kind: ERROR
+  regex: '(?m)^<<<<<<< |^>>>>>>> '
+severity: warning
+message: 残留 git 冲突标记, 合并冲突未解完 (禁止提交)

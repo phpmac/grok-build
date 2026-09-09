@@ -299,14 +299,6 @@ struct AgentLoadOutcome {
     /// client is driving mid-reconnect, adopted at finalize (mirrors the
     /// `SessionLoaded` adoption in `dispatch.rs`).
     running_prompt_id: Option<String>,
-<<<<<<< HEAD
-    /// `x.ai/schedulerBackgroundLoops` from the reload response. A reconnect
-    /// re-spawns the session actor, which re-pins the fire mode, so the
-    /// pre-reconnect value can be stale — adopt the reloaded one or `/loop`
-    /// describes a runtime the new actor will not use.
-    scheduler_background_loops: Option<bool>,
-=======
->>>>>>> upstream/main
 }
 
 /// Fields of the reconnect `session/load`, derived from the agent being
@@ -343,18 +335,12 @@ fn plan_reconnect_load(
         agent.session.cwd.clone()
     };
     let yolo = agent.session.is_yolo();
-<<<<<<< HEAD
     // Set BOTH yoloMode and autoMode explicitly. The leader's capability injection
     // only fills ABSENT keys, so omitting autoMode here lets a stale launch-time
     // `ClientCapabilities.auto_mode` re-enable Auto after the user left it (e.g.
     // Shift+Tab to Ask). Auto is per-agent (symmetric with yolo) — derive it from
     // this agent's own `auto_mode` so a background tab reconnects with ITS mode,
     // not the active tab's global `current_ui` mirror.
-=======
-    // The leader's capability injection only fills ABSENT keys
-    // Omitting autoMode would let a stale launch-time `ClientCapabilities.auto_mode` re-enable Auto after the user left it (e.g. Shift+Tab to Ask).
-    // Derive it from this agent's own `auto_mode` so a background tab reconnects with ITS mode, not the active tab's global `current_ui` mirror
->>>>>>> upstream/main
     let auto = super::dispatch::effective_auto(yolo, agent.session.is_auto());
     let mut meta = serde_json::json!({ "yoloMode": yolo, "autoMode": auto });
     if let Some(ref cursor) = agent.last_seen_event_id {
@@ -367,7 +353,6 @@ fn plan_reconnect_load(
     })
 }
 
-<<<<<<< HEAD
 /// Resolve the two post-reconnect restore outcomes from the per-agent
 /// `session/load` results.
 ///
@@ -382,11 +367,6 @@ fn plan_reconnect_load(
 /// `loads` maps each reloaded agent to `(success, running_prompt_id)`; an agent
 /// in `pending_agent_ids` but absent from `loads` is treated as failed
 /// (mirrors the `unwrap_or((false, _))` at the finalize site).
-=======
-/// Gating the drain on `all_restored` would let one failed background tab strand prompts queued on a healthy active tab.
-/// The drain (`dispatch_drain_queue`) only ever touches the active agent, so a background failure has no bearing on it.
-/// An agent in `pending_agent_ids` but absent from `loads` is treated as failed (mirrors the `unwrap_or((false, _))` at the finalize site).
->>>>>>> upstream/main
 fn reconnect_restore_outcome(
     init_ok: bool,
     pending_agent_ids: &[super::agent::AgentId],
@@ -401,7 +381,6 @@ fn reconnect_restore_outcome(
     (all_restored, active_restored)
 }
 
-<<<<<<< HEAD
 /// Compute the folder-trust verdict for the session cwd and seed
 /// [`AppView::trust_state`]. Pager-side mirror of the agent's resolve: read the
 /// local store, scan for repo-local code-exec config, and run the pure
@@ -411,11 +390,6 @@ fn reconnect_restore_outcome(
 /// becomes `TrustState::Pending` (show the question); everything else becomes
 /// `TrustState::Done`. The feature-off fast path (kill-switch / opt-out /
 /// local build) short-circuits before any I/O.
-=======
-/// Compute the folder-trust verdict for the session cwd and seed [`AppView::trust_state`].
-/// Pager-side mirror of the agent's resolve.
-/// Reads the local store, scans for repo-local code-exec config, and runs the pure [`decide`](xai_grok_workspace::folder_trust::decide) precedence.
->>>>>>> upstream/main
 fn seed_trust_state(
     app: &mut AppView,
     remote: Option<&xai_grok_shell::util::config::RemoteSettings>,
@@ -436,18 +410,12 @@ fn seed_trust_state(
     // construction), matching the `--trust` grant's `std::env::current_dir()`.
     let cwd = app.cwd.clone();
     let key = workspace_key(&cwd);
-<<<<<<< HEAD
     // Reuse the canonical gather (store trust + repo-config scan) but pass the
     // pager's stdin-only interactivity: the TUI prompts via the rendered
     // question + crossterm keyboard, NOT stderr (the pager redirects native
     // stderr at startup, so the engine's `stdin && stderr` would be false here
     // and the question would never show). TTY stdin => user can answer;
     // otherwise fail closed (no prompt).
-=======
-    // Reuse the canonical gather (store trust and repo-config scan) but pass the pager's stdin-only interactivity
-    // The pager redirects native stderr at startup, so the engine's `stdin && stderr` would be false here and the question would never show
-    // A TTY stdin means the user can answer; otherwise fail closed (no prompt)
->>>>>>> upstream/main
     let inputs = decide_inputs_with_interactive(&cwd, &key, std::io::stdin().is_terminal());
     app.trust_state = match decide(feature, &inputs) {
         TrustOutcome::Prompt => TrustState::Pending { workspace: key },
@@ -498,16 +466,11 @@ pub(super) fn park_input_reader(
 }
 
 /// Suspend the TUI, let a blocking child own the tty, then restore it.
-<<<<<<< HEAD
 ///
 /// Input is parked before the asynchronous frame writer is drained with a
 /// bounded wait, so neither the reader nor a queued frame can race the child.
 /// A park or drain timeout returns without starting the child; the caller keeps
 /// the request pending and retries it later.
-=======
-/// Input is parked before the asynchronous frame writer is drained with a bounded wait, so neither the reader nor a queued frame can race the child.
-/// A park or drain timeout returns without starting the child; the caller keeps the request pending and retries it later.
->>>>>>> upstream/main
 fn suspend_for_child(
     screen_mode: crate::app::ScreenMode,
     terminal: &mut PagerTerminal,
@@ -546,7 +509,6 @@ fn suspend_for_child(
         .is_minimal()
         .then(|| crossterm::cursor::position().ok())
         .flatten();
-<<<<<<< HEAD
     // Fullscreen stays on the alternate screen: a full-screen child (editor /
     // pager) draws over it directly, so the primary screen — the user's shell
     // — never flashes through while the child spawns. The child's own
@@ -556,11 +518,6 @@ fn suspend_for_child(
     // protocol or focus/mouse reporting still armed, the reports arriving in
     // the cooked-mode window before the child raws the tty (the Ctrl+G key
     // *releases*, a focus event) are echoed as visible escape codes.
-=======
-    // Fullscreen stays on the alternate screen
-    // A full-screen child (editor / pager) draws over it directly, so the primary screen (the user's shell) never flashes while the child spawns
-    // The child's own alt-screen exit may land back on the primary screen, so the return path re-enters without probing and the caller repaints
->>>>>>> upstream/main
     let kitty_pushed = crate::app::kitty_flags_pushed();
     let mouse_captured = crate::app::MOUSE_CAPTURE_ENABLED.load(Ordering::Acquire);
     xai_grok_shell::util::with_locked_stderr(|stderr| {
@@ -904,16 +861,11 @@ fn requeue_after_suspend_timeout<T>(pending: &mut Option<T>, request: T) {
 }
 
 /// Restore presentation after a child releases the tty.
-<<<<<<< HEAD
 ///
 /// A cat-style child leaves minimal mode's cursor below appended main-screen
 /// output, so re-anchor the live viewport there. An alternate-screen child
 /// restores the original cursor and needs no re-anchor. The caller then requests
 /// a full repaint because the child's writes bypassed ratatui's diff.
-=======
-/// A cat-style child leaves minimal mode's cursor below appended main-screen output, so re-anchor the live viewport there.
-/// The caller then requests a full repaint because the child's writes bypassed ratatui's diff.
->>>>>>> upstream/main
 fn restore_after_child(
     terminal: &mut PagerTerminal,
     screen_mode: crate::app::ScreenMode,
@@ -939,17 +891,12 @@ fn restore_after_child(
 }
 
 /// Consume a pending `$EDITOR` / `$PAGER` suspend request, if any.
-<<<<<<< HEAD
 ///
 /// Called at the top of every event-loop iteration because any select arm can
 /// queue one of these requests, including transcript completion during a draw.
 /// Each attempt uses a bounded safe-handoff wait; timeout leaves the one-shot
 /// request pending, reports once, and gates the next attempt behind a deferred
 /// timer so the feedback frame cannot trigger an immediate blocking retry.
-=======
-/// A timeout leaves the one-shot request pending and reports once.
-/// It also gates the next attempt behind a deferred timer so the feedback frame cannot trigger an immediate blocking retry.
->>>>>>> upstream/main
 #[allow(clippy::too_many_arguments)]
 fn run_pending_suspends(
     app: &mut AppView,
@@ -1252,7 +1199,6 @@ fn minimal_will_open_session(term_state: &TerminalState, app: &AppView) -> bool 
 }
 
 /// Run the main event loop until quit.
-<<<<<<< HEAD
 ///
 /// Returns a [`RunResult`] with optional exit info (for the resume hint)
 /// and a flag indicating whether the caller should restart the binary
@@ -1260,10 +1206,6 @@ fn minimal_will_open_session(term_state: &TerminalState, app: &AppView) -> bool 
 ///
 /// The initial theme MUST come from `term_state.initial_theme`; see
 /// [`TerminalState::initial_theme`] for why.
-=======
-/// Returns a [`RunResult`] with optional exit info (for the resume hint) and a flag for restarting the binary to pick up a downloaded update.
-/// The initial theme MUST come from `term_state.initial_theme`; see [`TerminalState::initial_theme`] for why.
->>>>>>> upstream/main
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run(
     terminal: &mut PagerTerminal,
@@ -1295,13 +1237,8 @@ pub(crate) async fn run(
     };
     app.pending_startup = Some(pending_startup);
     app.tracing_rx = Some(tracing_handle.rx);
-<<<<<<< HEAD
     // Startup terminal height for the auto-compact derivation; kept fresh by
     // `Event::Resize` from here on. 0 (probe failure) never forces compact.
-=======
-    // Startup terminal height for the auto-compact derivation; kept fresh by `Event::Resize` from here on 0 (probe failure) never forces compact
-    // 0 (probe failure) never forces compact
->>>>>>> upstream/main
     app.last_known_terminal_rows = crossterm::terminal::size().map(|(_, r)| r).unwrap_or(0);
     // Leader mode: a live `leader_status_rx` means the pager is connected via a
     // leader. The dashboard itself is NOT gated on this flag (it renders local
@@ -1345,19 +1282,12 @@ pub(crate) async fn run(
     if launch_auto {
         app.current_ui.permission_mode = Some("auto".into());
     }
-<<<<<<< HEAD
-    // One effective-config read for launch-mode ownership, the display
-    // resolve below, and the plugin-CTA marketplace key (the launch resolvers
-    // above keep their own internal read).
-    let launch_effective_config = xai_grok_shell::config::load_effective_config().ok();
-=======
     // One effective-config read for launch-mode ownership, the display resolve below, and the plugin-CTA marketplace key
     // The launch resolvers above keep their own internal read
     let launch_effective_config = {
         let _t = xai_grok_telemetry::instrumentation::timer("startup.app_init.launch_config");
         xai_grok_shell::config::load_effective_config().ok()
     };
->>>>>>> upstream/main
     let launch_effective_ui = launch_effective_config
         .as_ref()
         .and_then(|root| root.get("ui").cloned());
@@ -1721,21 +1651,6 @@ pub(crate) async fn run(
         .value,
     );
 
-<<<<<<< HEAD
-    // Pre-arrival seed only. The authoritative per-session value rides the
-    // `session/new` / `session/load` response, but `/loop` can be reached from
-    // the session-less dashboard and from a session whose response has not
-    // landed yet; both need an answer now, and this is the same resolver the
-    // shell runs at spawn, so the seed agrees with the flag as it stands today.
-    app.scheduler_background_loops_seed =
-        xai_grok_shell::util::config::resolve_scheduler_background_loops(
-            remote_settings
-                .as_ref()
-                .and_then(|s| s.scheduler_background_loops),
-        );
-
-=======
->>>>>>> upstream/main
     app.usage_billing_redirect_url = remote_settings
         .as_ref()
         .and_then(|s| s.usage_billing_redirect_url.clone());
@@ -1864,7 +1779,6 @@ pub(crate) async fn run(
         if !all_warnings.is_empty() {
             tracing::info!("Collected {} startup warnings", all_warnings.len());
         }
-<<<<<<< HEAD
         // WezTerm without the Kitty keyboard protocol breaks local input
         // (Shift+Enter can't insert newlines), so its banner is surfaced
         // directly (no SSH gate) and first — see `assemble_startup_warnings`.
@@ -1872,11 +1786,6 @@ pub(crate) async fn run(
         // only sent further down, right before the input reader thread is
         // spawned), so this banner covers env-detected WezTerm; the SSH shape
         // surfaces in /doctor once the async reply has landed.
-=======
-        // WezTerm without the Kitty keyboard protocol breaks local input (Shift+Enter can't insert newlines)
-        // Its banner therefore shows directly (no SSH gate) and first; see `assemble_startup_warnings`
-        // `xtversion::detected()` is structurally `None` here (the probe is only sent further down, right before the input reader thread is spawned)
->>>>>>> upstream/main
         let wezterm_warning = crate::diagnostics::wezterm_kitty_keyboard_warning(&snapshot);
         // Wayland no-data-control is surfaced without the SSH gate of
         // `summarize_warnings` — the broken shape is local (see
@@ -1931,17 +1840,11 @@ pub(crate) async fn run(
     // Single-key load so a malformed unrelated `[ui]` field cannot wipe this.
     let page_flip_on_send = crate::appearance::cache::load_page_flip_on_send();
     app.current_ui.page_flip_on_send = Some(page_flip_on_send);
-<<<<<<< HEAD
     // Disk load replaces `current_ui`. Assign one policy-clamped resolved
     // launch mode unconditionally (CLI > TOML > remote > Ask) so disk Auto
     // cannot win over `--permission-mode ask`, and a policy-clamped remote
     // AlwaysApprove cannot leave the UI claiming AlwaysApprove while
     // enforcement is Ask.
-=======
-    // Disk load replaces `current_ui`
-    // Disk Auto then cannot win over `--permission-mode ask`
-    // A policy-clamped remote AlwaysApprove cannot leave the UI claiming AlwaysApprove while enforcement is Ask
->>>>>>> upstream/main
     let display_mode: &'static str = if launch_auto {
         "auto"
     } else if launch_yolo.yolo {
@@ -1963,15 +1866,10 @@ pub(crate) async fn run(
     // Seed `/auto` feature-gate visibility from the resolved gate (so `/auto`
     // is offered on the welcome prompt when available).
     app.sync_permission_mode_slash_gate();
-<<<<<<< HEAD
     // Settings UI language (`[ui].voice_stt_language`) overrides `[voice].language`
     // when set. Store the preference (including client-only `auto`); the voice
     // crate resolves the wire code at STT connect. When unset, keep whatever
     // `from_config_table` loaded (default `en`, or an explicit `[voice].language`).
-=======
-    // Settings UI language (`[ui].voice_stt_language`) overrides `[voice].language` when set
-    // Store the preference (including client-only `auto`); the voice crate resolves the wire code at STT connect
->>>>>>> upstream/main
     // Must run after `load_initial_ui_config()` hydrates `current_ui` from disk.
     if let Some(ref pref) = app.current_ui.voice_stt_language {
         app.voice_config.language =
@@ -1993,16 +1891,10 @@ pub(crate) async fn run(
     );
     app.apply_contextual_hints(resolved_hints);
 
-<<<<<<< HEAD
     // Opt-in mouse-reporting toggle shortcut (Ctrl+R on scrollback). Off unless
     // explicitly enabled. Resolved in shell config (env override > effective
     // config > the parsed `UiConfig` field) so a partial `UiConfig` deserialize
     // failure cannot silently drop it.
-=======
-    // Opt-in mouse-reporting toggle shortcut (Ctrl+R on scrollback)
-    // Off unless explicitly enabled
-    // A partial `UiConfig` deserialize failure thus cannot silently drop it
->>>>>>> upstream/main
     let mouse_toggle = xai_grok_shell::util::config::resolve_mouse_reporting_toggle(
         effective_config.as_ref(),
         &app.current_ui,
@@ -2064,7 +1956,6 @@ pub(crate) async fn run(
     // version is already resolved when the startup telemetry above is emitted.
     crate::terminal::xtversion::probe_at_startup();
 
-<<<<<<< HEAD
     // Read terminal events on a dedicated thread and forward them over an mpsc
     // channel. The main `select!` consumes via `input_rx.recv()`, which is
     // cancellation-safe: when another arm wins, the recv future is dropped and
@@ -2074,11 +1965,6 @@ pub(crate) async fn run(
     // input on an idle screen was not serviced until an unrelated arm happened
     // to re-poll (every ~20s via recap_poll). The always-on tracing_rx tick
     // used to mask this by re-polling ~30Hz; this removes that dependency.
-=======
-    // Read terminal events on a dedicated thread and forward them over an mpsc channel
-    // When another arm wins, the recv future is dropped and re-created without losing the wakeup
-    // The always-on tracing_rx tick used to mask this by re-polling ~30Hz; the dedicated thread removes that dependency
->>>>>>> upstream/main
     let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<TimedInputEvent>();
     // Folder-trust verdict, seeded BEFORE the first render, before any session
     // is created (no repo-local MCP/LSP/hooks/plugins have loaded yet), and —
@@ -2105,17 +1991,12 @@ pub(crate) async fn run(
         replay_startup_typeahead(&input_tx, &mut startup_typeahead);
     } else if !startup_typeahead.is_empty() {
         // A startup screen (login/auth, folder-trust, paywall, ZDR) is still up.
-<<<<<<< HEAD
         // Replaying now would let that screen consume the keys — a prompt
         // starting with "n" would answer the folder-trust question and quit —
         // and deferring the replay until the screen resolves cannot restore
         // order: keystrokes typed right after the answer are already ahead in
         // the channel. Drop it; better than answering a prompt or scrambling the
         // composer. The common authed + trusted launch takes the branch above.
-=======
-        // Replaying now would let that screen consume the keys (a prompt starting with "n" would answer the folder-trust question and quit)
-        // Deferring the replay until the screen resolves cannot restore order: keystrokes typed after the answer are already ahead in the channel
->>>>>>> upstream/main
         crate::unified_log::debug(
             "startup type-ahead dropped (startup screen pending)",
             None,
@@ -2139,18 +2020,12 @@ pub(crate) async fn run(
     let reader_parked_thread = reader_parked.clone();
     std::thread::spawn(move || {
         use std::sync::atomic::Ordering;
-<<<<<<< HEAD
         // Bounds how long a tty handoff (external editor / pager) waits for
         // this thread to park: the pause flag is only observed between
         // `poll()` calls, so the timeout is the handoff latency. A `poll()`
         // timeout here does NOT wake the main loop -- only a successful
         // `send` does -- so the idle event loop still parks (no reintroduced
         // metronome tick); the extra idle wakeups are this thread's alone.
-=======
-        // Bounds how long a tty handoff (external editor / pager) waits for this thread to park
-        // The pause flag is only observed between `poll()` calls, so the timeout is the handoff latency
-        // A `poll()` timeout does NOT wake the main loop (only a successful `send` does), so the idle loop still parks (no metronome tick)
->>>>>>> upstream/main
         const POLL_TIMEOUT: Duration = Duration::from_millis(20);
         let mut consecutive_event_errors: u32 = 0;
         loop {
@@ -2210,18 +2085,12 @@ pub(crate) async fn run(
     let (progress_tx, mut progress_rx) =
         tokio::sync::mpsc::unbounded_channel::<effects::RestoreProgressMsg>();
 
-<<<<<<< HEAD
     // Voice STT pipeline is started lazily on first successful `/voice` (see
     // `VoiceState::ColdStart`), not at launch — avoids background work for users
     // who never enable voice mode. `AUDIO_SUPPORTED` reflects whether mic
     // capture is compiled in: true for production CLI builds on macOS/Windows
     // (cpal) and Linux (subprocess recorder), false for Bazel builds (no
     // capture in the test sandbox).
-=======
-    // Voice STT pipeline starts lazily on the first successful `/voice` (see `VoiceState::ColdStart`), not at launch
-    // That avoids background work for users who never enable voice mode
-    // `AUDIO_SUPPORTED` reflects whether mic capture is compiled in It is true for production CLI builds on macOS/Windows (cpal) and Linux (subprocess recorder)
->>>>>>> upstream/main
     let mut voice_rx = None::<tokio::sync::mpsc::Receiver<xai_grok_voice::VoiceEvent>>;
     let voice_auth_factory = connection.auth_manager.clone();
 
@@ -2243,14 +2112,9 @@ pub(crate) async fn run(
     let mut billing_poll_at: Option<Instant> = None;
 
     // `[ui.status_line] refresh_interval`: re-runs a command row on a timer.
-<<<<<<< HEAD
     // Read once, like the section it comes from, so a future config reload
     // must run this arming again; unarmed while the config reserves no row.
     // Re-derived on a mode switch (`run_pending_mode_switch`).
-=======
-    // Read once, like the section it comes from, so a future config reload must run this arming again
-    // Left unset while the config reserves no row
->>>>>>> upstream/main
     let mut status_line_refresh_interval: Option<Duration> =
         if super::status_line::draws_a_row(&app.current_ui.status_line) {
             app.status_line_refresh_interval()
@@ -2271,18 +2135,9 @@ pub(crate) async fn run(
         None
     };
 
-<<<<<<< HEAD
-    // Leader-mode roster poll (FleetView dashboard). Only fires while the
-    // dashboard is open AND we're connected via a leader. Armed to fire
-    // immediately at loop start so an already-open dashboard refreshes
-    // without waiting a full interval.
-    const ROSTER_POLL_INTERVAL: Duration = Duration::from_secs(1);
-    let mut roster_poll_at: Option<Instant> = Some(Instant::now());
-=======
     // Shared cadence for v1 roster refresh and v2 foreign-commit detection.
     const DASHBOARD_POLL_INTERVAL: Duration = Duration::from_secs(1);
     let mut dashboard_poll_at: Option<Instant> = Some(Instant::now());
->>>>>>> upstream/main
 
     // Pre-generate the automatic "return-from-away" recap while the terminal is
     // unfocused, so it's already in the scrollback (instant) when the user
@@ -2451,18 +2306,12 @@ pub(crate) async fn run(
         app.finish_startup(xai_grok_telemetry::startup::StartupOutcome::Ok);
     }
 
-<<<<<<< HEAD
     // Initial prompt from the CLI positional (`grok "fix the bug"`). When
     // already authenticated, hand it to the shared dispatcher helper (same
     // `NewSession`/`SendPrompt` path the welcome screen uses). ZDR-blocked
     // accounts cannot start a session, so drop the prompt — this mirrors the
     // deferred post-login path, which clears the startup prompt for ZDR-blocked
     // accounts. When not yet authenticated, stash it for `AuthComplete`.
-=======
-    // Initial prompt from the CLI positional (`grok "fix the bug"`)
-    // When already authenticated, hand it to the shared dispatcher helper (same `NewSession`/`SendPrompt` path the welcome screen uses)
-    // ZDR-blocked accounts cannot start a session, so drop the prompt
->>>>>>> upstream/main
     if let Some(initial_prompt) = args.initial_prompt() {
         if !app.session_startup_allowed() {
             app.deferred_startup.prompt = Some(initial_prompt.to_string());
@@ -2692,7 +2541,6 @@ pub(crate) async fn run(
                 app.voice_cmd_tx = Some(cmd_tx);
                 voice_rx = Some(event_rx);
                 tracing::info!("voice pipeline started (/voice or Ctrl+Space)");
-<<<<<<< HEAD
                 // The spawn is async, so begin capture now the pipeline is live
                 // — but only if the user is still on a surface that can receive
                 // dictation (an agent prompt or the dashboard dispatch input).
@@ -2700,11 +2548,6 @@ pub(crate) async fn run(
                 // normally can't have changed since the keypress; the else-arm
                 // is defensive cleanup so voice mode can't stay armed without
                 // capture ever starting.
-=======
-                // But only if the user is still somewhere that can receive dictation (an agent prompt or the dashboard dispatch input)
-                // This runs at loop-top before any new input, so that normally can't have changed since the keypress
-                // The else-arm is defensive cleanup so voice mode can't stay on without capture ever starting
->>>>>>> upstream/main
                 if matches!(
                     app.active_view,
                     ActiveView::Agent(_) | ActiveView::AgentDashboard
@@ -2754,20 +2597,6 @@ pub(crate) async fn run(
             app.gboom_release_all_games();
         }
 
-<<<<<<< HEAD
-        // Re-arm the dashboard roster poll when the dashboard is open but the
-        // poll has gone dormant — i.e. the dashboard was just opened. The poll
-        // arm leaves `roster_poll_at = None` only when it fired with the
-        // dashboard closed, so this fires an immediate refresh exactly on the
-        // closed→open transition rather than every iteration. Applies in both
-        // modes: leader mode polls the live roster, non-leader mode polls the
-        // local on-disk idle-session list.
-        if !app.workspace_dashboard_enabled
-            && roster_poll_at.is_none()
-            && matches!(app.active_view, ActiveView::AgentDashboard)
-        {
-            roster_poll_at = Some(Instant::now());
-=======
         // Cursor color follows the theme (OSC 12), enqueued. Compared by escape bytes so palette changes re-emit but startup/mode-switch inline applies never double-emit.
         // A drop to `None` (switch to the terminal theme's Reset accent) resets via OSC 112, but only over a color this session painted — an unprompted reset makes Ghostty latch an app override. The latch is synced so teardown stays a no-op after this.
         let cursor_color_wanted = crate::theme::cursor_color_escape();
@@ -2788,7 +2617,6 @@ pub(crate) async fn run(
             dashboard_poll_at = None;
         } else if dashboard_poll_at.is_none() {
             dashboard_poll_at = Some(Instant::now());
->>>>>>> upstream/main
         }
 
         // (Re-)arm the subscription watch on the dormant→wanted transition
@@ -2808,7 +2636,6 @@ pub(crate) async fn run(
             }
         };
 
-<<<<<<< HEAD
         // Dedicated scroll clock, derived fresh each iteration — a pure
         // function of scroll state, so no arm can forget to reschedule it.
         // Armed only while a wheel/trackpad stream is active, at the state
@@ -2816,11 +2643,6 @@ pub(crate) async fn run(
         // pending, the 80ms stream-gap finalize otherwise): scroll pacing
         // must never ride the slower animation fps, which turned residual
         // flushes into visible jumps.
-=======
-        // Dedicated scroll clock, derived fresh each iteration: a pure function of scroll state, so no arm can forget to reschedule it
-        // Armed only while a wheel/trackpad stream is active, at the state machine's own deadline
-        // Scroll pacing must never ride the slower animation fps, which turned residual flushes into visible jumps
->>>>>>> upstream/main
         let scroll_tick_at = {
             let now = Instant::now();
             app.scroll_state
@@ -2992,21 +2814,6 @@ pub(crate) async fn run(
                 }
             }
 
-<<<<<<< HEAD
-            // Biased order: cancellation/quit, writer acks/failures, ACP,
-            // task/progress results, updates, input, and render/poll timers all
-            // precede the deliberately-last voice STT arm (see its note below).
-
-            // Gated on empty terminal input: a token firehose keeps this arm
-            // ready at every biased poll, so without the gate buffered
-            // wheel/key events sat in input_rx until the stream went quiet.
-            // Safe: whenever the gate disables this arm, the input arm below
-            // is immediately ready, and it drains its whole backlog per
-            // iteration, so ACP resumes on the next loop (no reverse starve).
-            // Gating, not reordering: moving input above ACP would flip the
-            // starvation direction (streaming redraws starving behind held
-            // keys), and cancel/quit must stay above the firehose regardless.
-=======
             // Writer sat on unwritten payloads past the threshold: the terminal stopped
             // reading the pty. Field diagnosis for the mid-turn freeze family (loop alive,
             // screen frozen). Above the ACP arm so a mid-turn token firehose cannot starve it.
@@ -3034,7 +2841,6 @@ pub(crate) async fn run(
             // Without the gate, buffered wheel/key events sat in input_rx until the stream went quiet
             // Gating, not reordering: moving input above ACP would flip the starvation direction (streaming redraws starving behind held keys)
             // Cancel/quit must stay above the firehose regardless
->>>>>>> upstream/main
             msg = async {
                 match acp_peek.take() {
                     Some(msg) => Some(msg),
@@ -3051,16 +2857,11 @@ pub(crate) async fn run(
                 }
 
                 // Drain immediately-ready ACP messages before drawing.
-<<<<<<< HEAD
                 // During streaming, dozens of messages queue per frame;
                 // batching avoids per-message draws that starve terminal input.
                 // Bounded, and cut short the moment input arrives, so wheel/key
                 // events wait at most one batch — never a whole token flood.
                 // Starts at 1: the recv() above consumed this batch's first message.
-=======
-                // During streaming, dozens of messages queue per frame
-                // Bounded, and cut short the moment input arrives, so wheel/key events wait at most one batch, never a whole token flood
->>>>>>> upstream/main
                 let mut drained = 1;
                 while drained < ACP_DRAIN_BATCH_MAX && input_rx.is_empty() {
                     let Ok(msg) = acp_rx.try_recv() else { break };
@@ -3172,16 +2973,10 @@ pub(crate) async fn run(
                     );
                     let latest = update.latest_version;
                     app.pending_update_version = Some(latest.clone());
-<<<<<<< HEAD
                     // The full TUI surfaces this on the welcome screen, which
                     // minimal has none of — commit a one-line notice into
                     // native scrollback instead (update notice). `app`, not
                     // `term_state`: the mode can switch at runtime.
-=======
-                    // The full TUI shows this on the welcome screen, which minimal has none of Commit a one-line update notice into native scrollback instead `app`, not `term_state`: the mode can switch at runtime
-                    // Commit a one-line update notice into native scrollback instead
-                    // `app`, not `term_state`: the mode can switch at runtime
->>>>>>> upstream/main
                     if app.screen_mode.is_minimal() {
                         dispatch::commit_minimal_update_notice(&mut app, &latest);
                     }
@@ -3215,17 +3010,11 @@ pub(crate) async fn run(
                         break;
                     }
                 }
-<<<<<<< HEAD
                 // Opportunistic clipboard-image poll: this iteration already ran
                 // for input / FocusGained / resize, so ride it (throttled,
                 // changeCount-first). Never scheduled by a timer — an idle app
                 // polls zero times. Run before schedule_tick so a freshly shown
                 // tip's TTL arms the animation ticks that later clear it.
-=======
-                // Opportunistic clipboard-image poll (throttled, changeCount-first)
-                // Never scheduled by a timer: an idle app polls zero times
-                // Run before schedule_tick so a freshly shown tip's TTL arms the animation ticks that later clear it
->>>>>>> upstream/main
                 let tip_shown = app.poll_clipboard_focus_tip();
                 schedule_tick(&mut animation_tick_at, &app, tick_interval);
                 if result.needs_draw || tip_shown {
@@ -3374,18 +3163,8 @@ pub(crate) async fn run(
                 }
             }
 
-<<<<<<< HEAD
-            _ = roster_poll => {
-                roster_poll_at = None;
-                // Only poll while the dashboard is open. When it is not active
-                // we deliberately do NOT re-arm, so the loop isn't woken once
-                // per second forever. In leader mode we poll the live FleetView
-                // roster; outside leader mode we poll the local on-disk
-                // idle-session list so the dashboard still shows idle sessions.
-=======
             _ = dashboard_poll => {
                 dashboard_poll_at = None;
->>>>>>> upstream/main
                 let dashboard_open = matches!(app.active_view, ActiveView::AgentDashboard);
                 if dashboard_open {
                     let effects = if app.workspace_dashboard_enabled {
@@ -3420,7 +3199,6 @@ pub(crate) async fn run(
             // Hot-reload: config file changed (dev mode) or initial load.
             Ok(()) = config_watcher.changed() => {
                 let mut config = config_watcher.current().clone();
-<<<<<<< HEAD
                 // Preserve fields persisted via `~/.grok/config.toml [ui]`
                 // rather than `~/.grok/pager.toml`. The watcher only knows
                 // about pager.toml, so a hot-reload would otherwise revert
@@ -3429,11 +3207,6 @@ pub(crate) async fn run(
                 // any correction, so its fast path cannot skip a needed
                 // prompt-widget fan-out (`set_appearance` alone never syncs
                 // `PromptWidget.compact`).
-=======
-                // The watcher only knows about pager.toml, so a hot-reload would otherwise revert these to their hardcoded defaults
-                // The canonical re-derive below owns any correction, so its fast path cannot skip a needed prompt-widget fan-out
-                // (`set_appearance` alone never syncs `PromptWidget.compact`.)
->>>>>>> upstream/main
                 config.prompt.compact = app.appearance.prompt.compact;
                 config.show_timestamps = app.appearance.show_timestamps;
                 config.show_timeline = app.appearance.show_timeline;
@@ -3496,7 +3269,6 @@ pub(crate) async fn run(
                 let status = rx.borrow_and_update().clone();
                 match status {
                     ConnectionStatus::Reconnecting { attempt } => {
-<<<<<<< HEAD
                         // Unified-log marker: an IPC reconnect mints a new leader-side
                         // ClientId, which orphans responses to this client's in-flight
                         // RPCs and drops outbound lines held across the swap — the
@@ -3504,11 +3276,6 @@ pub(crate) async fn run(
                         // Without this marker the reconnect is invisible in the
                         // unified log (it only surfaced as ghost `session loaded`
                         // replays with no matching `session.load.start`).
-=======
-                        // Unified-log marker: an IPC reconnect mints a new leader-side ClientId
-                        // Without this marker the reconnect is invisible in the unified log
-                        // It only surfaced as ghost `session loaded` replays with no matching `session.load.start`
->>>>>>> upstream/main
                         crate::unified_log::warn(
                             "leader.ipc.reconnecting",
                             None,
@@ -3560,7 +3327,6 @@ pub(crate) async fn run(
                             }
                         }
 
-<<<<<<< HEAD
                         // Open a reload window on EVERY agent with a session
                         // (active tab first so the visible one restores
                         // fastest): a freshly (re-)elected leader has no
@@ -3570,11 +3336,6 @@ pub(crate) async fn run(
                         // on its next prompt). Replay is staged into fresh
                         // state per agent and each existing transcript stays
                         // recoverable until its load outcome is known.
-=======
-                        // Open a reload window on EVERY agent with a session (active tab first so the visible one restores fastest)
-                        // Reloading only the active session would leave every other tab on a session id the new leader has never seen
-                        // Their next prompt would then fail with "unknown session id"
->>>>>>> upstream/main
                         let fallback_cwd = app.cwd.clone();
                         let active_agent_id = match app.active_view {
                             ActiveView::Agent(id) => Some(id),
@@ -3649,16 +3410,7 @@ pub(crate) async fn run(
 
                                 let mut loads = Vec::with_capacity(load_plans.len());
                                 for (agent_id, plan) in load_plans {
-<<<<<<< HEAD
-                                    // Reconnect path — no resolved compat in scope; default
-                                    // (all-on) preserves existing behavior.
-                                    let mcp_servers = xai_grok_shell::util::config::load_mcp_servers(
-                                        &plan.cwd,
-                                        &xai_grok_tools::types::compat::CompatConfig::default(),
-                                    );
-=======
                                     let mcp_servers = effects::discover_mcp_servers(plan.cwd.clone()).await;
->>>>>>> upstream/main
                                     let load_req = acp::LoadSessionRequest::new(plan.session_id, plan.cwd).mcp_servers(mcp_servers).meta(plan.meta.as_object().cloned());
                                     match acp_send(load_req, &acp_tx).await {
                                         Ok(resp) => {
@@ -3744,7 +3496,6 @@ pub(crate) async fn run(
                     }
                 };
 
-<<<<<<< HEAD
                 // Finalize the reload windows on the agents the re-init was
                 // started for — NOT whatever view is active now (see
                 // `SessionReload` for the outcome handling). Each window
@@ -3752,11 +3503,6 @@ pub(crate) async fn run(
                 // discard the other tabs' replayed transcripts), then a
                 // mid-reconnect running turn is adopted, mirroring the
                 // `SessionLoaded` adoption in dispatch.rs.
-=======
-                // Finalize the reload windows on the agents the re-init was started for, NOT whatever view is active now
-                // See `SessionReload` for the outcome handling
-                // Each window resolves on ITS load outcome (one broken session must not discard the other tabs' replayed transcripts)
->>>>>>> upstream/main
                 let mut loads: std::collections::HashMap<_, _> = outcome
                     .loads
                     .into_iter()
@@ -3783,14 +3529,6 @@ pub(crate) async fn run(
                 for id in &pending.agent_ids {
                     let (ok, running_prompt_id) = loads.remove(id).unwrap_or((false, None));
                     if let Some(agent) = app.agents.get_mut(id) {
-<<<<<<< HEAD
-                        // The reloaded actor re-pinned the fire mode; a failed
-                        // load leaves the previous value rather than guessing.
-                        if let Some(mode) = scheduler_background_loops {
-                            agent.scheduler_background_loops = Some(mode);
-                        }
-=======
->>>>>>> upstream/main
                         agent.finalize_reload_and_maybe_adopt(
                             pending.generation,
                             ok,
@@ -3808,7 +3546,6 @@ pub(crate) async fn run(
                     app.show_toast("Session restore failed. Kept the existing transcript.");
                 }
 
-<<<<<<< HEAD
                 // Re-trigger the queue drain suppressed during the outage: every
                 // normal trigger (PromptResponse, DrainQueue, send-prompt,
                 // session-created) early-returns while `reconnect_pending` is set
@@ -3816,11 +3553,6 @@ pub(crate) async fn run(
                 // on the active tab's own restore (see `reconnect_restore_outcome`):
                 // a failed active restore suppresses the drain, since sending into
                 // an unrestored session would be wrong.
-=======
-                // Re-trigger the queue drain suppressed during the outage
-                // Every normal trigger (PromptResponse, DrainQueue, send-prompt, session-created) early-returns while `reconnect_pending` is set
-                // A failed active restore suppresses the drain, since sending into an unrestored session would be wrong
->>>>>>> upstream/main
                 if active_restored {
                     let drain_effects = dispatch::dispatch(Action::DrainQueue, &mut app);
                     if process_effects(drain_effects, &mut tasks, &mut app, &progress_tx) {
@@ -3831,7 +3563,6 @@ pub(crate) async fn run(
                 presenter.request(false);
             }
 
-<<<<<<< HEAD
             // Voice STT — DELIBERATELY THE LAST (lowest-priority) arm. In a
             // biased select, an arm that is ready on most iterations masks every
             // arm below it. A hot mic (toggle capture stays open across pauses)
@@ -3841,11 +3572,6 @@ pub(crate) async fn run(
             // stream, task/progress completions, keyboard input, or the render/
             // animation/poll timers — voice is only serviced when nothing else is
             // pending. Draw throttle uses min_draw_interval.
-=======
-            // A burst can backlog the 128-slot channel, so `voice_rx` is effectively always-ready
-            // Kept last, it can never starve cancellation, ACP, task/progress completions, keyboard input, or the render/animation/poll timers
-            // Voice is only serviced when nothing else is pending
->>>>>>> upstream/main
             ev = async {
                 match voice_rx.as_mut() {
                     Some(rx) => rx.recv().await,
@@ -3990,12 +3716,6 @@ fn plugin_cta_marketplace_from(config: &toml::Value) -> Option<String> {
     (!name.is_empty()).then(|| name.to_string())
 }
 
-<<<<<<< HEAD
-=======
-/// True only when the terminal has been unfocused past the recap threshold (once per away period, gated by [`FocusTracker::recap_due`]).
-/// The shell must have rolled out session recap (`session_recap_available`), with no opt-out via `ui.notifications.session_recap`.
-/// The active agent must have *finished its turn* with nothing pending that could wake it: idle, no modal, no pending question, established session.
->>>>>>> upstream/main
 fn should_pregenerate_away_recap(app: &AppView) -> bool {
     if !(app.session_recap_available
         && app.notification_service.focus_tracker.recap_due()
@@ -4191,7 +3911,6 @@ fn normalize_input_event(
 }
 
 /// Process a terminal event, then drain any buffered events before returning.
-<<<<<<< HEAD
 ///
 /// Crossterm buffers input events while the app is drawing. Without draining,
 /// each event triggers a separate `draw()` call. When draw takes longer than
@@ -4204,10 +3923,6 @@ fn normalize_input_event(
 /// processing to fix paste on terminals without bracketed paste (e.g.
 /// Windows PowerShell), filter leaked CSI fragments (SGR mouse and focus
 /// reports), and recombine relay-mangled X10 mouse reports.
-=======
-/// Without draining, each event triggers a separate `draw()` call.
-/// Before processing, [`coalesce_rapid_keys`] fixes paste on terminals without bracketed paste (e.g. Windows PowerShell).
->>>>>>> upstream/main
 async fn drain_and_process(
     first: TimedInputEvent,
     input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<TimedInputEvent>,
@@ -4274,21 +3989,7 @@ async fn drain_and_process(
         let ev = &routed.event;
         match ev {
             Event::FocusGained => {
-<<<<<<< HEAD
-                // Re-assert mouse capture on refocus: ConPTY-backed relays
-                // (VS Code on Windows hosting a WSL/SSH session) can strip DEC
-                // private modes, silently downgrading mouse reports from SGR
-                // to legacy X10 — whose >= 95-column coordinate bytes then
-                // corrupt into typed characters. Idempotent everywhere else,
-                // and gated so a deliberate capture-off state is never undone.
-                if crate::app::MOUSE_CAPTURE_ENABLED.load(std::sync::atomic::Ordering::Acquire) {
-                    xai_grok_shell::util::with_locked_stderr(|stderr| {
-                        let _ = crossterm::execute!(stderr, crossterm::event::EnableMouseCapture);
-                    });
-                }
-=======
                 reassert_mouse_capture_on_focus(&app.escape_writer);
->>>>>>> upstream/main
                 // Force a full repaint on refocus to heal out-of-band stranded rows.
                 // Sets needs_draw (not had_non_resize_change); the draw site honors force_repaint
                 // ahead of the resize debounce, clearing even a coalesced same-size resize.
@@ -4303,7 +4004,6 @@ async fn drain_and_process(
                     && app.notification_service.focus_tracker.recap_due()
                     && app.notification_service.config().session_recap;
                 app.notification_service.focus_tracker.on_focus_gained();
-<<<<<<< HEAD
                 // Pre-warm AppKit's lazy dlopen off the UI thread (once) so the
                 // first changeCount poll after returning is just the cheap
                 // metadata read and never stalls a frame on the framework load.
@@ -4311,11 +4011,6 @@ async fn drain_and_process(
                 // opportunistic poll (driven after drain_and_process) does the
                 // actual clipboard check — no debounce, no timer, and
                 // `needs_animation` is never kept hot for it.
-=======
-                // The first changeCount poll after returning is then just the cheap metadata read and never stalls a frame on the framework load
-                // FocusGained is itself an active loop iteration, so the opportunistic poll (after drain_and_process) does the clipboard check
-                // No debounce, no timer, and `needs_animation` is never kept hot for it
->>>>>>> upstream/main
                 if app.contextual_hints.image_input
                     && crate::clipboard::clipboard_image_probe_supported()
                 {
@@ -4389,17 +4084,6 @@ async fn drain_and_process(
             }
             _ => {}
         }
-<<<<<<< HEAD
-        // Voice capture chord (Ctrl+Space or F8), handled here before normal
-        // routing so the release reaches us and the key never lands as text.
-        // Hold-to-talk where releases are reported (press records, release
-        // stops), else tap toggle. A release is only ours when a hold session
-        // owns it, so a bare Space release (Ctrl lifted first) stops
-        // hold-to-talk without eating every Space release during normal typing.
-        // `[ui].voice_keybind_enabled` (read live, like `voice_capture_mode`)
-        // silences chord presses without touching `/voice` — see
-        // `voice_chord_claims_event` for the exact press/release/hold gating.
-=======
         // A feedback composer must not start voice capture against the hidden main prompt.
         if let Event::Key(ke) = ev
             && is_voice_chord(ke)
@@ -4414,7 +4098,6 @@ async fn drain_and_process(
         // Voice capture chord (Ctrl+Space or F8), handled here before normal routing so the release reaches us and the key never lands as text
         // A release is only ours when a hold session owns it
         // A bare Space release (Ctrl lifted first) thus stops hold-to-talk without eating every Space release during normal typing
->>>>>>> upstream/main
         if let Event::Key(ke) = ev
             && app.voice_mode_enabled
             && xai_grok_voice::AUDIO_SUPPORTED
@@ -4626,17 +4309,11 @@ const PASTE_COALESCE_THRESHOLD: usize = 3;
 #[cfg(target_os = "windows")]
 const PATH_COALESCE_THRESHOLD: usize = 8;
 
-<<<<<<< HEAD
 /// Check if a terminal event is a pasteable key press — a character,
 /// Enter, or Tab with no control modifiers (Ctrl/Alt/Super).
 ///
 /// Only matches `Press` (not `Repeat` or `Release`). Repeat events come
 /// from held keys, not paste; Release events carry no semantic content.
-=======
-/// Check if a terminal event is a pasteable key press: a character, Enter, or Tab with no control modifiers (Ctrl/Alt/Super).
-/// Only matches `Press` (not `Repeat` or `Release`).
-/// Repeat events come from held keys, not paste; Release events carry no text.
->>>>>>> upstream/main
 fn is_pasteable_key_event(ev: &Event) -> bool {
     match ev {
         Event::Key(ke) if ke.kind == KeyEventKind::Press => match ke.code {
@@ -4652,17 +4329,11 @@ fn is_pasteable_key_event(ev: &Event) -> bool {
     }
 }
 
-<<<<<<< HEAD
 /// A pasted line feed (`\n`, 0x0A). In raw mode crossterm parses a bare LF as
 /// `Ctrl+J` (0x0A is the control code for `j`), while a real Enter keypress is
 /// a carriage return (`\r`) parsed as [`KeyCode::Enter`]. So an `Enter`
 /// immediately followed by this is a pasted CRLF line break, not a submit —
 /// see [`coalesce_rapid_keys`].
-=======
-/// A pasted line feed (`\n`, 0x0A).
-/// In raw mode crossterm parses a bare LF as `Ctrl+J` (0x0A is the control code for `j`).
-/// So an `Enter` immediately followed by this is a pasted CRLF line break, not a submit; see [`coalesce_rapid_keys`].
->>>>>>> upstream/main
 fn is_paste_lf(ev: &Event) -> bool {
     matches!(ev, Event::Key(ke)
         if ke.kind == KeyEventKind::Press
@@ -4675,15 +4346,10 @@ fn active_feedback_modal_open(app: &AppView) -> bool {
 }
 
 /// Map a voice-chord key event to its action (pure, so it's unit-testable).
-<<<<<<< HEAD
 ///
 /// Hold mode is press-to-record / release-to-stop, but only a hold-*owned*
 /// session stops on release; a `/voice`/toggle session (not hold-owned) has no
 /// release of its own, so a press toggles it off. Elsewhere it's a tap toggle.
-=======
-/// Hold mode is press-to-record / release-to-stop, but only a hold-*owned* session stops on release.
-/// A `/voice`/toggle session (not hold-owned) has no release of its own, so a press toggles it off.
->>>>>>> upstream/main
 fn voice_chord_action(
     hold_mode: bool,
     releases_reported: bool,
@@ -4706,7 +4372,6 @@ fn voice_chord_action(
     }
 }
 
-<<<<<<< HEAD
 /// Whether the event-loop intercept claims a voice-chord key event (pure for
 /// unit tests).
 ///
@@ -4716,11 +4381,6 @@ fn voice_chord_action(
 /// Outside a hold, a bare release is never ours (normal typing) and a press
 /// honors the setting; an unclaimed press falls through to normal routing,
 /// where `ActionId::VoiceToggle` resolution is gated on the same setting.
-=======
-/// Whether the event-loop intercept claims a voice-chord key event (pure for unit tests).
-/// Its release only ever stops capture, so flipping the setting off mid-hold must not orphan it and wedge the mic open.
-/// Outside a hold, a bare release is never ours (normal typing) and a press honors the setting.
->>>>>>> upstream/main
 fn voice_chord_claims_event(kind: KeyEventKind, keybind_enabled: bool, hold_owned: bool) -> bool {
     if hold_owned {
         return true;
@@ -4728,17 +4388,11 @@ fn voice_chord_claims_event(kind: KeyEventKind, keybind_enabled: bool, hold_owne
     kind != KeyEventKind::Release && keybind_enabled
 }
 
-<<<<<<< HEAD
 /// The voice-capture chord: **Ctrl+Space** or **F8**. A press needs the exact
 /// chord (matching the registry, so Shift+F8 / Ctrl+Alt+Space don't fire); a
 /// release matches the key alone (Space/F8), since on Kitty the Ctrl release can
 /// precede Space and drop the CONTROL bit. Callers gate release handling on an
 /// owning hold session, so a stray bare release is a no-op.
-=======
-/// The voice-capture chord: **Ctrl+Space** or **F8**.
-/// A press needs the exact chord (matching the registry, so Shift+F8 / Ctrl+Alt+Space don't fire).
-/// Callers gate release handling on an owning hold session, so a stray bare release is a no-op.
->>>>>>> upstream/main
 fn is_voice_chord(ke: &KeyEvent) -> bool {
     match ke.kind {
         KeyEventKind::Release => matches!(ke.code, KeyCode::Char(' ') | KeyCode::F(8)),
@@ -4749,7 +4403,6 @@ fn is_voice_chord(ke: &KeyEvent) -> bool {
     }
 }
 
-<<<<<<< HEAD
 /// Coalesce runs of rapid key events into synthetic `Event::Paste`
 /// events. On terminals without bracketed paste, pasted text arrives
 /// as individual key events; Enter keys mid-run would otherwise
@@ -4771,11 +4424,6 @@ fn is_voice_chord(ke: &KeyEvent) -> bool {
 ///    instead of a bracketed paste; this branch recovers them.
 ///
 /// No-op when bracketed paste already arrives as `Event::Paste`.
-=======
-/// On terminals without bracketed paste, pasted text arrives as individual key events.
-/// Enter keys mid-run would otherwise trigger "submit prompt" and split multi-line pastes.
-/// **Windows only:** `>= PATH_COALESCE_THRESHOLD` events AND the assembled text starts with a drag-drop-style path anchor.
->>>>>>> upstream/main
 #[cfg(test)]
 fn coalesce_rapid_keys(events: Vec<TimedInputEvent>) -> Vec<TimedInputEvent> {
     let live_input_started_at = events
@@ -5078,7 +4726,6 @@ pub(crate) fn retarget_suppress_code_restore(app: &mut AppView, from: &str, to: 
     }
 }
 
-<<<<<<< HEAD
 /// Shared [`SessionFlags`] builder (interactive loop + leader-cluster).
 ///
 /// Permission seeds come from the global mirrors (`default_yolo`,
@@ -5086,11 +4733,6 @@ pub(crate) fn retarget_suppress_code_restore(app: &mut AppView, from: &str, to: 
 /// update those synchronously, and `ActionThenForward` batches mode dispatch
 /// before this runs, so create meta sees the post-mode values without
 /// effect-shape sniffing.
-=======
-/// Shared [`SessionFlags`] builder (interactive loop and leader-cluster).
-/// Permission seeds come from the global mirrors (`default_yolo`, `current_ui.permission_mode`).
-/// Create meta therefore sees the post-mode values without effect-shape sniffing.
->>>>>>> upstream/main
 pub(crate) fn session_flags_for_effects(
     app: &mut AppView,
     #[cfg_attr(not(feature = "local-workspace"), allow(unused_variables))]

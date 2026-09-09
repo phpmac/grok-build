@@ -37,6 +37,7 @@ xai-grok-extra-ca = { workspace = true }
 xai-grok-sampler = { workspace = true }
 xai-token-estimation = { workspace = true }
 dirs = { workspace = true }
+xai-grok-env = { workspace = true }
 # Single cross-edge: `events::ToolCallCompleted.outcome` reuses
 # `xai_grok_session_events::types::ToolOutcome` so the local event log and
 # the product telemetry event share the same enum surface.

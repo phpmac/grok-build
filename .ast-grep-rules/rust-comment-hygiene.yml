@@ -1,0 +1,12 @@
+# 禁注释内全角标点: 本仓规范为中文注释 + 英文标点.
+# 根因: 手写注释多次带入全角标点 (hookify warn-chinese-punctuation 反复纠正, 拦截不总生效), 沉淀为 AST 规则.
+# 例外: em dash 与省略号不计 (上游英文排版大量使用); 弯引号 (U+201C-D/U+2018-9) 不计 (上游英文 curly quotes 与中文引号同码位, 无法区分); 不抓 emoji 与 UI 符号 (TUI 字形/unicode 测试注释合法使用); 字符集用 unicode 转义保持本文件纯 ASCII.
+id: rust-comment-hygiene
+language: Rust
+rule:
+  any:
+    - kind: line_comment
+    - kind: block_comment
+  regex: '\x{FF0C}|\x{3002}|\x{FF01}|\x{FF1F}|\x{FF1B}|\x{FF1A}|\x{FF08}|\x{FF09}|\x{300A}|\x{300B}|\x{3010}|\x{3011}|\x{3001}|\x{FFE5}'
+severity: warning
+message: 注释含全角标点, 须改为英文标点

@@ -300,11 +300,6 @@ pub struct PagerLocalSnapshot {
     /// language actually in effect when `[ui].voice_stt_language` is unset but
     /// an explicit `[voice].language` applies.
     pub voice_stt_language: String,
-    /// Mirrors `AgentView::scheduler_background_loops` — the value the shell
-    /// pinned for THIS session — falling back to
-    /// `AppView::scheduler_background_loops_seed` before the session response
-    /// lands. `/loop` reads it to describe where a scheduled fire runs.
-    pub scheduler_background_loops: bool,
 }
 
 impl Default for PagerLocalSnapshot {

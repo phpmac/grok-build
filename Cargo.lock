@@ -14487,6 +14487,7 @@ dependencies = [
  "xai-file-utils",
  "xai-grok-auth",
  "xai-grok-config",
+ "xai-grok-env",
  "xai-grok-extra-ca",
  "xai-grok-otel",
  "xai-grok-sampler",

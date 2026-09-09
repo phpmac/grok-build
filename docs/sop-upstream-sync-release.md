@@ -86,8 +86,8 @@ git merge upstream/main -m "WIP merge"
 | 文件 | 策略 |
 |------|------|
 | `crates/codegen/xai-grok-{pager,pager-bin,shell,version}/Cargo.toml` 的 `version` | **本地产品号** `${NEW_LOCAL}`, 不要上游 `0.2.x` |
-| `Cargo.lock` 中上述 4 个 package 的 `version` | 与 Cargo.toml 一致 = `${NEW_LOCAL}` |
-| `Cargo.lock` 中 telemetry 依赖段 (上游引入 sentry) | **逐行删 sentry, 保留相邻 rustls 等 dev-dep**; 禁整冲突块删空 (v1.14.0 曾误删 rustls 致 CI `--locked` 三平台全挂) |
+| `Cargo.lock` | **禁手拼** (v1.23.0 曾手拼连挂 3 次). 官方实践: lock 只能由 cargo 生成. 做法: 以上游原版 lock 为基底, 跑 `cargo metadata --format-version 1 > /dev/null` 触发最小变更补丁, 再用 `cargo metadata --locked` 复验; 本机禁 cargo 时用临时 workflow_dispatch 在 CI runner 上跑同一命令, 取 artifact 替换. `generate-lockfile` 是全量刷新 (会把依赖拉到最新, 可能撞 rust-toolchain 的 rustc 版本), 别用它 |
+| `Cargo.lock` 中 telemetry 依赖段 | 上游若带回 sentry: lock 由 cargo 按 toml 重新 resolve 自动剔除, 不手删段 |
 | `crates/codegen/xai-grok-shell/CHANGELOG.md` | 顶部写本地 `1.x` 段; 可保留上游 `0.2.x` 段在 `changelogs/` |
 | `SOURCE_REV` | 吃上游 (merge 通常已自动) |
 | soft-warn / auto_update / local_ui / 无 Sentry | **保留本地**, 见 §3 |
@@ -313,6 +313,7 @@ EOF
 - tag 与 Release **都要有**; 禁止只打 tag
 - notes **禁止**列 assets 清单 / 禁止 `*.sha256`
 - title 中文概括主题, 版本号由 tag 承载
+- **打 tag 前必须过完整编译验证** (v1.23.0 曾拿 Release workflow 当测试场连挂 5 次): 本机 `CARGO_TARGET_DIR=/tmp/xxx cargo check --locked -p xai-grok-pager-bin` 全绿 (用完 `rm -rf /tmp/xxx`), 或 CI 预检 workflow 全绿, 才允许 push tag
 
 ---
 
