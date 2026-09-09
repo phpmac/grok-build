@@ -14538,7 +14538,7 @@ dependencies = [
 
 [[package]]
 name = "xai-grok-tools"
-version = "0.1.220-alpha.4"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -14631,7 +14631,7 @@ dependencies = [
 
 [[package]]
 name = "xai-grok-tools-api"
-version = "0.1.220-alpha.4"
+version = "0.2.0"
 dependencies = [
  "prost",
  "serde",
@@ -14644,7 +14644,7 @@ dependencies = [
 
 [[package]]
 name = "xai-grok-update"
-version = "0.1.220-alpha.4"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "dunce",
@@ -14704,7 +14704,7 @@ dependencies = [
 
 [[package]]
 name = "xai-grok-workspace"
-version = "0.1.220-alpha.4"
+version = "0.2.0"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
