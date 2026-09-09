@@ -1,0 +1,37 @@
+# 临时: 基于上游原版 lock 最小变更生成与本地 toml 一致的 Cargo.lock
+name: TmpLockgen
+
+on:
+  workflow_dispatch:
+
+jobs:
+  lockgen:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        run: |
+          rustup show active-toolchain || true
+          rustc --version
+          cargo --version
+      - name: Reset lockfile to upstream base
+        run: |
+          # 本地手改过的 lock 已脏 (大面积重解); 以上游原版 lock 为基底最小变更
+          git config --global user.email noreply@xai.com
+          git config --global user.name lockgen
+          git remote add upstream https://github.com/xai-org/grok-build.git || true
+          git fetch upstream main --depth 1
+          git show upstream/main:Cargo.lock > Cargo.lock
+      - name: Generate lockfile (minimal delta)
+        run: |
+          cargo generate-lockfile
+      - name: Verify lockfile consistency
+        run: |
+          cargo metadata --locked --format-version 1 > /dev/null
+          echo LOCK_CONSISTENT
+      - name: Upload lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
