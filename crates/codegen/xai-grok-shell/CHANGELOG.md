@@ -1,3 +1,13 @@
+# 1.23.1 - 2026-09-09
+
+## Features
+
+- **同步全局规则到系统提示词 prompt.md**: collaboration 增补用户方案不可行或有更优时持续给建议与禁奉承; action_safety 增补未获明确授权禁 commit.
+
+## Notes
+
+- 产品版本本地 1.x 补丁递增; 无上游同步, SOURCE_REV 不变.
+
 # 1.23.0 - 2026-09-09
 
 ## Features
