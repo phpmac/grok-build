@@ -26,7 +26,6 @@ xai-grok-pager-diff = { path = "../xai-grok-pager-diff" }
 # Rendering
 ratatui = { workspace = true, features = ["crossterm", "unstable-widget-ref"] }
 xai-grok-announcements = { workspace = true }
-enum_delegate = { workspace = true }
 crossterm = { workspace = true, features = ["event-stream", "bracketed-paste"] }
 derive_more = { version = "2", features = ["deref", "deref_mut"] }
 textwrap = { workspace = true }
