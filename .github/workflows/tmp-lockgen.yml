@@ -1,0 +1,29 @@
+# 临时: 在 CI 上生成与 Cargo.toml 完全一致的 Cargo.lock (本机禁 cargo)
+name: TmpLockgen
+
+on:
+  workflow_dispatch:
+
+jobs:
+  lockgen:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        run: |
+          rustup show active-toolchain || true
+          rustc --version
+          cargo --version
+      - name: Generate lockfile
+        run: |
+          rm Cargo.lock
+          cargo generate-lockfile
+          # 只 resolve 不编译, 校验产物存在
+          test -f Cargo.lock
+          grep -c '\[\[package\]\]' Cargo.lock
+      - name: Upload lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
