@@ -1,3 +1,14 @@
+# 1.23.4 - 2026-09-11
+
+## Features
+
+- **系统提示词按上游骨架重铺**: `prompt.md` 先吃回官方 work_policy/tool_calling/background_tasks/formatting/browser_verification; 用精简全局规则覆盖输出/安全/调研; **丢掉上游 `<communication>`** (与短报冲突); 删掉叠了多轮的 PREP/金字塔/100 字帽/`所有任务都已经完成` 收尾.
+- **补官方 `<memory>`**: 按 [xai-org/grok-build@37949780](https://github.com/xai-org/grok-build/commit/37949780c144e37df692e3d669051a21fec24f20) 的 filesystem memory 段合入; 开关用本仓已有的 `memory_enabled` (官方新名 `memory_v2_enabled` 尚未合代码).
+
+## Notes
+
+- 产品版本本地 1.x 补丁递增; 无上游同步, SOURCE_REV 不变.
+
 # 1.23.3 - 2026-09-10
 
 ## Features
