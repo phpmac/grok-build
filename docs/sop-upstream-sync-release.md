@@ -313,7 +313,7 @@ EOF
 - tag 与 Release **都要有**; 禁止只打 tag
 - notes **禁止**列 assets 清单 / 禁止 `*.sha256`
 - title 中文概括主题, 版本号由 tag 承载
-- **打 tag 前必须过完整编译验证** (v1.23.0 曾拿 Release workflow 当测试场连挂 5 次): 本机 `CARGO_TARGET_DIR=/tmp/xxx cargo check --locked -p xai-grok-pager-bin` 全绿 (用完 `rm -rf /tmp/xxx`), 或 CI 预检 workflow 全绿, 才允许 push tag
+- **打 tag 前必须过完整编译验证** (v1.23.0 / v1.20.2 曾拿 Release 当第一次编译连挂): 先 push `main`, 等 `.github/workflows/precheck.yml` (`cargo check --locked -p xai-grok-pager-bin`) 全绿, 才允许 push tag. 本机禁 cargo; 不要用 tag Release 试编译
 
 ---
 

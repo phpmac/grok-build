@@ -1,3 +1,14 @@
+# 1.23.5 - 2026-09-12
+
+## Features
+
+- **Release CI 离开 Node 20**: `actions/checkout@v7` / `upload-artifact@v7` / `download-artifact@v7` ([GitHub Node 20 弃用](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/)).
+- **新增 Precheck workflow**: push/PR 先 `cargo check --locked -p xai-grok-pager-bin`, 禁止再拿 tag Release 当第一次编译.
+
+## Notes
+
+- 产品版本本地 1.x 补丁递增; 无上游同步, SOURCE_REV 不变.
+
 # 1.23.4 - 2026-09-11
 
 ## Features
