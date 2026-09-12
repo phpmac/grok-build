@@ -1,4 +1,4 @@
-# push/PR 先 cargo check --locked, 禁止拿 Release tag 当第一次编译
+# push/PR 先 cargo check --locked + fork 回归测试, 禁止拿 Release tag 当第一次编译
 name: Precheck
 
 on:
@@ -15,10 +15,10 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
-  check:
-    name: cargo check --locked
+  precheck:
+    name: check + fork regression
     runs-on: macos-14
-    timeout-minutes: 60
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
 
@@ -42,3 +42,18 @@ jobs:
 
       - name: cargo check
         run: cargo check --locked -p xai-grok-pager-bin
+
+      # CLAUDE.md "fork 回归测试" 段的用例. 本机禁 cargo, 本地设计的守门只能靠这里.
+      # 只编译测试目标, 不开全 workspace, 不出产物.
+      # xai-grok-agent: prompt.md 模板 (memory 段门控 / 体积软上限 16384 / 变量守卫)
+      # xai-grok-hooks: local_fork, soft_warn, parse_allow_with_reason, PostToolUse observe
+      # xai-grok-pager-bin: should_check_for_updates
+      # xai-grok-pager: local_ui (cfg(test) 下不 suppress); pager 测试上万条, 只跑该用例
+      - name: cargo test (agent prompt template)
+        run: cargo test --locked -p xai-grok-agent --lib prompt::template
+
+      - name: cargo test (hooks / pager-bin)
+        run: cargo test --locked -p xai-grok-hooks -p xai-grok-pager-bin
+
+      - name: cargo test (pager local_ui)
+        run: cargo test --locked -p xai-grok-pager local_ui
