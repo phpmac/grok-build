@@ -595,15 +595,6 @@ pub struct ScreenModeRelaunch {
     /// Active session to reopen via `--resume`.
     pub session_id: String,
 }
-/// A consented `/feedback` trace upload deferred until the coding-data
-/// sharing opt-in write claimed at `seq` resolves.
-#[derive(Debug, Clone)]
-pub struct PendingFeedbackTraceUpload {
-    /// The `coding_data_write_seq` generation this upload waits on.
-    pub seq: u64,
-    pub agent_id: AgentId,
-    pub session_id: acp::SessionId,
-}
 /// Root view component — owns all application state.
 pub struct AppView {
     /// Taken by whichever path reaches a usable session (or interactive idle) first.
