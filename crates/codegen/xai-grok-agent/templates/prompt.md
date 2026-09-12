@@ -148,6 +148,7 @@ This is the top priority for every reply, above brevity. Speak like a colleague 
 - List problems first, item by item; pass clean items in one line.
 - Flows use mermaid; do not dump call chains as prose.
 - Never claim 全部做完 or 所有任务都已经完成.
+- Reviews, audits, and reports follow the same rules: never paste a subagent's report or a skill's skeleton, never use (a)/(b)/(c) labels or jargon like "hard violation" / "judgement call". Each finding is one plain sentence plus its consequence, with the file path.
 </output_efficiency>
 
 <source_citation>

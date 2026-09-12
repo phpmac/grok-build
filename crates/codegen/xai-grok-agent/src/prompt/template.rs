@@ -394,13 +394,13 @@ mod tests {
     // ── Memory section ──────────────────────────────────────────────
 
     #[test]
-    fn test_memory_enabled_does_not_render_memory_section() {
-        // The <memory> section was removed from the minimal base prompt.
-        // Even when the memory tools are registered AND memory_enabled=true,
-        // the trimmed template must not render a memory section. (Complements
-        // test_memory_disabled_omits_memory_section, which covers the default.)
+    fn test_memory_enabled_renders_memory_section() {
+        // 本地 fork 保留 <memory> 段 (官方 37949780 的 filesystem memory):
+        // memory_enabled=true 时必须整段渲染, 路径由 placeholders 解析.
+        // 与 test_memory_disabled_omits_memory_section 互补, 后者覆盖默认关闭.
         let tools: HashMap<ToolKind, String> = [
             (ToolKind::Read, "read_file".to_string()),
+            (ToolKind::Edit, "search_replace".to_string()),
             (ToolKind::MemorySearch, "memory_search".to_string()),
             (ToolKind::MemoryGet, "memory_get".to_string()),
         ]
@@ -408,18 +408,20 @@ mod tests {
         let r = TemplateRenderer::new(tools, HashMap::new());
         let mut p = default_placeholders();
         p["memory_enabled"] = serde_json::json!(true);
+        p["memory_global_path"] = serde_json::json!("/tmp/grok/global-memory");
+        p["memory_workspace_path"] = serde_json::json!("/tmp/grok/ws-memory");
         let prompt = render_base(&r, &p);
         assert!(
-            !prompt.contains("<memory>"),
-            "Memory section was removed from the minimal prompt"
+            prompt.contains("<memory>") && prompt.contains("</memory>"),
+            "memory_enabled=true must render the <memory> section"
         );
         assert!(
-            !prompt.contains("memory_search"),
-            "memory tool names must not appear once the memory section is gone"
+            prompt.contains("/tmp/grok/global-memory/topics/"),
+            "global memory path must come from memory_global_path"
         );
         assert!(
-            !prompt.contains("memory_get"),
-            "memory tool names must not appear once the memory section is gone"
+            prompt.contains("/tmp/grok/ws-memory/topics/"),
+            "workspace memory path must come from memory_workspace_path"
         );
     }
 
