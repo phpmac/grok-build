@@ -1,3 +1,15 @@
+# 1.27.0 - 2026-10-07
+
+## Features
+
+- **恢复 GitHub Actions 构建**: 取回删除前的 `release.yml` (tag `v*` 触发, aarch64-apple-darwin 打包并上传 Release) 与 `precheck.yml` (push/PR 先 `cargo check --locked` + fork 回归测试), 发版产包回归 CI, 不再本机打包.
+- **prompt.md 并入全局规则 `reply_format`**: 三种写作格式 (准则 ISO 24495-1 / 科学写作 ISO 24495-3 / 受控技术英语 ASD-STE100), 默认第 3 种, 用户点名可切换; `<research_tools>` 补 due-diligence 尽调入口. 对齐源: skills `plugins/a/CLAUDE.md`.
+
+## Notes
+
+- 上游无新增提交 (`HEAD..upstream/main = 0`, SOURCE_REV 559751fd 不变), 本版为本地变更发版.
+- 产品版本 1.26.0 -> 1.27.0; 产物由 `release.yml` 在 GitHub Actions 产出, 本机禁 cargo.
+
 # 1.26.0 - 2026-09-30
 
 ## Features

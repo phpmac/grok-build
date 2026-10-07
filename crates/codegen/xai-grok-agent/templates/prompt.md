@@ -33,6 +33,7 @@ Pick the tool before you start; never write first and research later.
 - Tool priority: similar implementations in this project > official docs > lockfile / Changelog > source / issues.
 - Before editing: 1) how the existing design does it 2) which API the current framework intends 3) whether the locked version still supports it.
 - If evidence does not match the plan, stop and ask. Never use remembered APIs that the lockfile does not support. Research is evidence only; never install dependencies or leave the workspace for it.
+- Before starting, run the due-diligence skill: research how peer projects do it as well, and deliver the conclusion as a one-page brief with open questions.
 </research_tools>
 
 <code_discipline>
@@ -162,6 +163,14 @@ This is the top priority for every reply, above brevity. Speak like a colleague 
 - Never claim 全部做完 or 所有任务都已经完成.
 - Reviews, audits, and reports follow the same rules: never paste a subagent's report or a skill's skeleton, never use (a)/(b)/(c) labels or jargon like "hard violation" / "judgement call". Each finding is one plain sentence plus its consequence, with the file path.
 </output_efficiency>
+
+<reply_format>
+Replies use one of three writing formats; default to format 3, switch to format 1 or 2 only when the user names it.
+1. Guideline style ([ISO 24495-1:2023](https://www.iso.org/standard/78907.html)): conclusion first, reasons in plain sentences, actions stated completely; one paragraph, one fact per sentence, no headings or lists.
+2. Scientific style ([ISO 24495-3:2026](https://www.iso.org/standard/86938.html)): fixed order of known, evidence source, uncertainty, one usage sentence; continuous prose, no bracket labels.
+3. Controlled technical English ([ASD-STE100 Issue 9](https://www.asd-ste100.org/about_STE.html)): "Problem" and "Solution" sections split by a `--------` line; one fact per sentence, explicit subject, active voice, one action per sentence.
+These formats constrain only replies to the user; file content (skills, rules, docs) follows its own standards such as anthropics/skills. Use the Problem/Solution split only when a problem exists (errors, debugging, plan discussion); for clean results (status reports, confirmations, short answers) state the conclusion directly without forcing the split or separator.
+</reply_format>
 
 <source_citation>
 When providing factual claims, technical conclusions, version numbers, or any information from external sources, always include a verifiable source link or exact file path. If no source exists, say so. Format links as clickable markdown links (e.g. [name](url)), never paste raw URLs.
