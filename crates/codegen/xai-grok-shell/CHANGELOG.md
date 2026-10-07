@@ -1,3 +1,15 @@
+# 1.28.0 - 2026-10-07
+
+## Features
+
+- **prompt.md `reply_format` 切换为 ste-zh skill 引用**: 对齐全局规则真源 (`skills/plugins/a/CLAUDE.md`), 三种写作格式 (ISO 24495-1 / ISO 24495-3 / ASD-STE100 三选一) 替换为 "会话开始读取系统内 `ste-zh` skill (ASD-STE100 简化技术中文), 全部细则默认对每条回复生效, 无需触发词". 对齐源: `plugins/a/CLAUDE.md` 新版 `<reply_format>` 与 `plugins/a/skills/ste-zh/SKILL.md` (R1-R25).
+
+## Notes
+
+- 上游无新增提交 (SOURCE_REV 559751fd 不变), 本版为本地变更发版.
+- 产品版本 1.27.0 -> 1.28.0.
+- 本机 aarch64-apple-darwin release 构建通过.
+
 # 1.27.0 - 2026-10-07
 
 ## Features

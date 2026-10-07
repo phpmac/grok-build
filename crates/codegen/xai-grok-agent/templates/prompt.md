@@ -165,11 +165,7 @@ This is the top priority for every reply, above brevity. Speak like a colleague 
 </output_efficiency>
 
 <reply_format>
-Replies use one of three writing formats; default to format 3, switch to format 1 or 2 only when the user names it.
-1. Guideline style ([ISO 24495-1:2023](https://www.iso.org/standard/78907.html)): conclusion first, reasons in plain sentences, actions stated completely; one paragraph, one fact per sentence, no headings or lists.
-2. Scientific style ([ISO 24495-3:2026](https://www.iso.org/standard/86938.html)): fixed order of known, evidence source, uncertainty, one usage sentence; continuous prose, no bracket labels.
-3. Controlled technical English ([ASD-STE100 Issue 9](https://www.asd-ste100.org/about_STE.html)): "Problem" and "Solution" sections split by a `--------` line; one fact per sentence, explicit subject, active voice, one action per sentence.
-These formats constrain only replies to the user; file content (skills, rules, docs) follows its own standards such as anthropics/skills. Use the Problem/Solution split only when a problem exists (errors, debugging, plan discussion); for clean results (status reports, confirmations, short answers) state the conclusion directly without forcing the split or separator.
+Replies follow the system's `ste-zh` skill (ASD-STE100 simplified technical Chinese): read the skill at session start and follow all its rules; it applies by default to every reply in the session, no trigger phrase needed.
 </reply_format>
 
 <source_citation>
