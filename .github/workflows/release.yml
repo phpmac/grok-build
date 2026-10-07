@@ -97,9 +97,21 @@ jobs:
           mapfile -t files < <(find artifacts -type f -name 'grok-*.tar.gz' | sort)
           test "${#files[@]}" -gt 0
 
-          # notes 由发版流程事先写好; 此处仅上传产物, 不覆盖已有说明.
+          # Release 已由发版流程建好: 只传产物, 不覆盖已有说明.
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "${files[@]}" --clobber
-          else
-            gh release create "$tag" "${files[@]}" --title "$tag" --generate-notes
+            exit 0
           fi
+
+          # 说明取自 annotated tag: 首行标题, 空行后正文; 无 annotation 回退 generate-notes.
+          git init -q .
+          git remote add origin "https://github.com/${GH_REPO}.git"
+          git fetch -q --depth=1 origin "refs/tags/${tag}:refs/tags/${tag}"
+          title="$(git tag -l --format='%(contents:subject)' "${tag}")"
+          body="$(git tag -l --format='%(contents:body)' "${tag}")"
+          if [ -z "$title" ]; then
+            gh release create "$tag" "${files[@]}" --title "$tag" --generate-notes
+            exit 0
+          fi
+          printf '%s' "$body" > /tmp/notes.md
+          gh release create "$tag" "${files[@]}" --title "$title" --notes-file /tmp/notes.md
