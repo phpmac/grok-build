@@ -709,12 +709,8 @@ pub(crate) fn execute(
                                 "query".into(),
                                 serde_json::Value::String(q.clone()),
                             );
-                        } else {
-                            obj.insert(
-                                "allowRelax".into(),
-                                serde_json::Value::Bool(true),
-                            );
                         }
+                        // 本地设计: browse 不再发 allowRelax, 会话列表严格限当前目录 (含同 repo worktree), 上游的空目录放宽会跨项目泄露
                         if let Some(kinds) = &kind_filter {
                             obj.insert(
                                 "_meta".into(),

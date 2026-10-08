@@ -472,11 +472,13 @@ impl MvpAgent {
             .collect()
     }
     /// Full roster: resident actors plus recent on-disk sessions; resident wins an id collision.
+    /// Dormant 会话按启动目录限定 (含同 repo worktree 兄弟目录), 上游默认全盘扫最近 200 条会把同级项目的会话混进 Dashboard.
     pub(crate) async fn build_roster(&self) -> Vec<crate::agent::roster::RosterEntry> {
         let resident = self.resident_roster_entries();
-        let summaries = crate::session::persistence::list_recent_summaries(200)
+        let mut summaries = crate::session::persistence::list_recent_summaries(200)
             .await
             .unwrap_or_default();
+        crate::session::merge::retain_project_scoped_summaries(&mut summaries, self.launch_cwd());
         let entries = crate::agent::roster::merge_roster(resident, summaries);
         self.cache_resident_titles(&entries);
         entries

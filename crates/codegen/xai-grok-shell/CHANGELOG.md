@@ -1,3 +1,17 @@
+# 1.28.1 - 2026-10-08
+
+## Fixes
+
+- **会话列表跨目录泄露收口 (三处)**:
+  - Dashboard/FleetView: `build_roster` 原全盘扫最近 200 条 Dormant 会话, 同级项目 (ARL/FishEye 等) 标题混入; 新增 `merge::retain_project_scoped_summaries` 按启动目录 + 同 repo worktree 兄弟目录过滤.
+  - 非 git 目录远程全放行: `fetch_lanes` 原在 `repo_urls` 为空 (非 git / 无 remote) 时全量合并注册中心会话; 现清空远程 lane, 无法归因 repo 的远程会话不放行.
+  - picker 空目录放宽: TUI browse 原发 `allowRelax: true` 触发 `ListScope::Repo/All` 放宽; 现不再发送, 列表严格限当前目录.
+
+## Notes
+
+- 上游无新增提交 (SOURCE_REV 559751fd 不变), 本版为本地变更发版.
+- 产品版本 1.28.0 -> 1.28.1.
+
 # 1.28.0 - 2026-10-07
 
 ## Features

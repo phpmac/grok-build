@@ -1758,7 +1758,7 @@ async fn foreign_resume_detection_runs_as_task_result() {
         other => panic!("expected ForeignResumeHintDetected, got {other:?}"),
     }
 }
-/// `FetchSessionList` wire shape: search sends `query` (no `allowRelax`); browse opts into `allowRelax` and parses `x.ai/listScope`.
+/// `FetchSessionList` wire shape: search and browse both send `query`-only params, no `allowRelax` (本地设计: 列表不放宽跨目录); browse parses `x.ai/listScope`.
 /// All outcomes echo `seq` and `query`.
 #[tokio::test]
 async fn fetch_session_list_pushes_query_and_echoes_seq() {
@@ -1922,9 +1922,10 @@ async fn fetch_session_list_pushes_query_and_echoes_seq() {
             "plain fetch must not send a query key: {:?}",
             nth(&captured, 1)
         );
-    assert_eq!(
-            j(nth(&captured, 1), "allowRelax"), true,
-            "browse fetches opt into relaxing"
+    assert!(
+            nth(&captured, 1).get("allowRelax").is_none(),
+            "browse fetches must not opt into relaxing: {:?}",
+            nth(&captured, 1)
         );
     assert_eq!(j(nth(&captured, 3), "query"), "fail-me");
 }

@@ -106,6 +106,26 @@ pub(crate) fn retain_matching_cwd(remote: &mut Vec<SessionRecord>, keys: &[Strin
     remote.retain(|r| keys.iter().any(|k| r.cwd.trim_end_matches('/') == k));
 }
 
+/// FleetView/Dashboard 的 Dormant 会话按启动目录限定: 当前目录拼写 + 同 repo 的 worktree 兄弟目录.
+/// 上游默认全盘取最近 200 条, 同级项目的会话标题会混进 Dashboard, 属跨目录泄露, 本地设计收窄.
+pub(crate) fn retain_project_scoped_summaries(summaries: &mut Vec<Summary>, cwd: &std::path::Path) {
+    let mut keys = cwd_match_keys(&cwd.to_string_lossy());
+    if let Ok(siblings) =
+        crate::session::worktree::candidate_worktree_cwds_for_same_repo(cwd)
+    {
+        keys.extend(siblings);
+    }
+    retain_summaries_matching_cwd_keys(summaries, &keys);
+}
+
+/// Pure cwd-key matching for [`retain_project_scoped_summaries`].
+pub(crate) fn retain_summaries_matching_cwd_keys(summaries: &mut Vec<Summary>, keys: &[String]) {
+    summaries.retain(|s| {
+        keys.iter()
+            .any(|k| s.info.cwd.trim_end_matches('/') == k.as_str())
+    });
+}
+
 /// Fetch sessions from both local storage and the remote registry, merge, dedup, and return a sorted list.
 pub async fn fetch_merged(
     client: Option<&SessionRegistryClient>,
@@ -229,6 +249,10 @@ pub(crate) async fn fetch_lanes(
             retain_matching_cwd(&mut remote, &exact_keys);
         }
         local.retain(|s| Path::new(&s.info.cwd).is_absolute());
+    } else if repo_urls.is_empty() {
+        // 本地设计: 当前目录无法归因到 repo (非 git 或无 remote) 时, 远程会话全不放行.
+        // 上游在这类目录全量合并注册中心会话, 标题跨项目泄露.
+        remote.clear();
     }
     // `grok --resume <uuid>` resolves across every cwd
     // Promote an exact UUID hit from any local directory into the lane before merge filters
@@ -511,6 +535,19 @@ mod tests {
     #[test]
     fn cwd_keys_ignore_a_trailing_separator() {
         assert_eq!(cwd_match_keys("/Users/me/xai/"), ["/Users/me/xai"]);
+    }
+
+    #[test]
+    fn retain_summaries_matching_cwd_keys_keeps_only_requested_cwd() {
+        let mut summaries = vec![
+            make_summary("a", "in project", "2026-03-01T00:00:00Z"),
+            make_summary("b", "sibling project", "2026-03-01T00:00:00Z"),
+        ];
+        summaries[0].info.cwd = "/Users/me/xai/".into();
+        summaries[1].info.cwd = "/Users/me/other".into();
+        retain_summaries_matching_cwd_keys(&mut summaries, &["/Users/me/xai".to_owned()]);
+        let ids: Vec<&str> = summaries.iter().map(|s| s.info.id.0.as_ref()).collect();
+        assert_eq!(ids, ["a"]);
     }
 
     #[test]
