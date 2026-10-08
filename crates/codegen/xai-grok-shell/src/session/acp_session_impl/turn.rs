@@ -2715,6 +2715,8 @@ impl SessionActor {
         );
         let mut transient_retry_attempts: u32 = 0;
         let transient_retry_enabled = self.transient_retry_enabled;
+        // 本地设计: 主会话 429 限速重试计数, 每回合重置, 只用于退避与展示
+        let mut rate_limit_resubmits: u32 = 0;
         let mut turn_span_totals = TurnSpanTotals::default();
         let mut structured_output_retries: u32 = 0;
         let mut media_gen_resamples: u32 = 0;
@@ -3159,6 +3161,46 @@ impl SessionActor {
                             max_retries: display_max,
                             reason: format!("{cause}; retrying request"),
                             error_type: Some(kind.as_ref().to_string()),
+                        },
+                    ))
+                    .await;
+                    sleep(delay).await;
+                    turn_phases.record_sampling_retries(1);
+                    continue;
+                }
+                Ok(SamplerTurnOutcome::WaitOutRateLimit { retry_after_secs }) => {
+                    // 本地设计: 主会话普通 429 无限重试, 尊重 Retry-After, 指数退避封顶 30s; Esc 在 sleep 处取消.
+                    rate_limit_resubmits += 1;
+                    let delay = xai_grok_sampler::retry_after_or_backoff(
+                        rate_limit_resubmits,
+                        retry_after_secs,
+                    );
+                    let announced =
+                        std::time::Duration::from_secs(delay.as_secs_f64().round().max(1.0) as u64);
+                    xai_grok_telemetry::unified_log::warn(
+                        "shell.turn.rate_limit_wait_retry",
+                        Some(self.session_info.id.0.as_ref()),
+                        Some(serde_json::json!({
+                            "loop_index": loop_index,
+                            "attempt": rate_limit_resubmits,
+                            "delay_ms": delay.as_millis() as u64,
+                            "retry_after_secs": retry_after_secs,
+                        })),
+                    );
+                    self.send_xai_notification(XaiSessionUpdate::RetryState(
+                        crate::extensions::notification::RetryState::Retrying {
+                            attempt: rate_limit_resubmits,
+                            max_retries:
+                                crate::extensions::notification::RETRY_ATTEMPTS_UNLIMITED,
+                            reason: format!(
+                                "Rate limited; waiting {} before trying again",
+                                human_duration(announced)
+                            ),
+                            error_type: Some(
+                                xai_grok_sampler::SamplingErrorKind::RateLimited
+                                    .as_ref()
+                                    .to_string(),
+                            ),
                         },
                     ))
                     .await;

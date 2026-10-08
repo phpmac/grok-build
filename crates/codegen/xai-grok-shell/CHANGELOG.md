@@ -1,3 +1,14 @@
+# 1.28.2 - 2026-10-08
+
+## Fixes
+
+- **模型 429 限速不再终止回合 (主会话无限重试)**: 此前模型返回 "Rate limit reached for requests" 时, 采样器内部重试 2 次耗尽后回合直接失败, 会话停住等人工重发. 现在 `handle_sampling_failure` 的 RateLimited 臂对主会话返回新恢复分支 `WaitOutRateLimit`, 外层回合循环按 Retry-After (无则指数退避, 封顶 30s) sleep 后重建请求重交, 无次数上限; Esc 在 sleep 处可取消. 状态条显示 `Rate limited | Retrying (N)...` (新 wire 哨兵 `RETRY_ATTEMPTS_UNLIMITED`, pager 不渲染总数). 例外: `subscription:free-usage-exhausted` paywall 仍按终态上报弹 upsell; 子代理维持原 8 次/150s 预算等待; 预算型 workflow 子代理维持失败关门. 回归测试: `main_session_rate_limit_requests_wait_out_retry`, `free_usage_paywall_stays_terminal`, pager `retry_clause_hides_total_for_unlimited_sentinel`.
+
+## Notes
+
+- 上游无新增提交 (SOURCE_REV 559751fd 不变), 本版为本地变更发版.
+- 产品版本 1.28.1 -> 1.28.2.
+
 # 1.28.1 - 2026-10-08
 
 ## Fixes

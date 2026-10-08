@@ -1324,6 +1324,14 @@ impl SessionActor {
         }
 
         if matches!(error.kind, SamplingErrorKind::RateLimited) {
+            // 本地设计: 主会话普通 429 不终止回合, 交由外层循环限速等待重试; 免费额度 paywall 仍按终态上报 (pager 弹 upsell).
+            if !self.startup_hints.is_subagent
+                && !crate::sampling::error::is_free_usage_exhausted_error(&detailed_message)
+            {
+                return Ok(SamplerFailureRecovery::WaitOutRateLimit {
+                    retry_after_secs: error.retry_after_secs,
+                });
+            }
             self.log_terminal_failure("rate_limited", error.status_code, &detailed_message);
             self.send_xai_notification(XaiSessionUpdate::RetryState(
                 crate::extensions::notification::RetryState::Exhausted {
@@ -1953,6 +1961,9 @@ impl SessionActor {
             }
             SamplerFailureRecovery::RetryTransient { kind, status_code } => {
                 Ok(SamplerTurnOutcome::RetryTransient { kind, status_code })
+            }
+            SamplerFailureRecovery::WaitOutRateLimit { retry_after_secs } => {
+                Ok(SamplerTurnOutcome::WaitOutRateLimit { retry_after_secs })
             }
         }
     }

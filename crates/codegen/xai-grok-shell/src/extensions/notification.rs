@@ -1288,6 +1288,10 @@ pub const PROMPT_COMPLETE_ERROR_KIND_KEY: &str = "errorKind";
 /// Frozen shell ↔ pager wire value — old pagers match the literal.
 pub const CONTEXT_LENGTH_ERROR_TYPE: &str = "context_length";
 
+/// `RetryState::Retrying.max_retries` sentinel: this wait loop has no attempt cap.
+/// 本地设计: 主会话普通 429 一直限速重试; pager 据此不渲染总数.
+pub const RETRY_ATTEMPTS_UNLIMITED: u32 = u32::MAX;
+
 /// State of a retry operation or error for visual feedback in the TUI
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", tag = "type")]

@@ -132,6 +132,13 @@ pub(crate) fn retry_clause(attempt: u32, max_retries: u32, style: RetryLabelStyl
     // Longer headline plus U+2026 wraps this status row into the prompt.
     match style {
         RetryLabelStyle::Status => format!("Retrying (attempt {attempt})..."),
+        // 本地设计: 主会话 429 等待无次数上限, shell 发 u32::MAX 哨兵, 不渲染总数
+        RetryLabelStyle::Compact
+            if max_retries
+                == xai_grok_shell::extensions::notification::RETRY_ATTEMPTS_UNLIMITED =>
+        {
+            format!("Retrying ({attempt})...")
+        }
         RetryLabelStyle::Compact => format!("Retrying ({attempt}/{max_retries})"),
     }
 }
@@ -1039,5 +1046,26 @@ mod tests {
             .headline,
             "Request failed"
         );
+    }
+
+    /// 本地设计: shell 的 u32::MAX 哨兵表示无次数上限的 429 等待, 不渲染总数.
+    #[test]
+    fn retry_clause_hides_total_for_unlimited_sentinel() {
+        let unlimited = xai_grok_shell::extensions::notification::RETRY_ATTEMPTS_UNLIMITED;
+        assert_eq!(
+            format_retry_activity_label(
+                3,
+                unlimited,
+                "Rate limited; waiting 30s before trying again",
+                Some("rate_limited"),
+                RetryLabelStyle::Compact
+            ),
+            "Rate limited | Retrying (3)..."
+        );
+        assert_eq!(
+            retry_clause(3, unlimited, RetryLabelStyle::Compact),
+            "Retrying (3)..."
+        );
+        assert_eq!(retry_clause(2, 5, RetryLabelStyle::Compact), "Retrying (2/5)");
     }
 }

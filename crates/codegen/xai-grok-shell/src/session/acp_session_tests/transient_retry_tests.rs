@@ -249,6 +249,61 @@ async fn kill_switch_disables_the_arm() {
         .await;
 }
 
+/// 本地设计: 主会话普通 429 返回 WaitOutRateLimit, 回合不终止, 由外层循环限速重试.
+#[tokio::test(flavor = "current_thread")]
+async fn main_session_rate_limit_requests_wait_out_retry() {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async {
+            let (actor, _rx) = make_actor().await;
+            let result = actor
+                .handle_sampling_failure(
+                    error_of_kind(xai_grok_sampler::SamplingErrorKind::RateLimited, Some(429)),
+                    0,
+                    transient_state(0, true),
+                    false,
+                    TurnParkState::Fresh,
+                )
+                .await;
+            match result {
+                Ok(SamplerFailureRecovery::WaitOutRateLimit { retry_after_secs }) => {
+                    assert_eq!(retry_after_secs, None);
+                }
+                Ok(_) => panic!("main-session 429 must wait out, got another recovery"),
+                Err(e) => panic!("main-session 429 must not be terminal: {e:?}"),
+            }
+        })
+        .await;
+}
+
+/// 免费额度 paywall 仍按终态上报, pager 靠它弹 upsell 而不是无限等待.
+#[tokio::test(flavor = "current_thread")]
+async fn free_usage_paywall_stays_terminal() {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async {
+            let (actor, _rx) = make_actor().await;
+            let mut error =
+                error_of_kind(xai_grok_sampler::SamplingErrorKind::RateLimited, Some(429));
+            error.message =
+                "subscription:free-usage-exhausted: You have used all your free usage.".to_string();
+            let result = actor
+                .handle_sampling_failure(
+                    error,
+                    0,
+                    transient_state(0, true),
+                    false,
+                    TurnParkState::Fresh,
+                )
+                .await;
+            assert!(
+                result.is_err(),
+                "the free-usage paywall must stay terminal instead of waiting out forever"
+            );
+        })
+        .await;
+}
+
 /// Budgeted workflow children never enter the arm: the guards that account token usage run before it and fail closed to a terminal error.
 #[tokio::test(flavor = "current_thread")]
 async fn budgeted_workflow_child_stays_terminal() {

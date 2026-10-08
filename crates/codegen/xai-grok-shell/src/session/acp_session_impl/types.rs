@@ -55,6 +55,12 @@ pub(crate) enum SamplerFailureRecovery {
         kind: xai_grok_sampler::SamplingErrorKind,
         status_code: Option<u16>,
     },
+    /// 本地设计: 主会话普通 429 限速等待重试, 无次数上限 (免费额度 paywall 除外).
+    /// 外层回合循环负责 sleep 后重建请求并重交.
+    WaitOutRateLimit {
+        /// 被拒请求的 Retry-After 提示 (秒); None 时按指数退避.
+        retry_after_secs: Option<u64>,
+    },
 }
 
 /// Outcome of a single turn attempt via the sampler-based path.
@@ -76,6 +82,10 @@ pub(crate) enum SamplerTurnOutcome {
     RetryTransient {
         kind: xai_grok_sampler::SamplingErrorKind,
         status_code: Option<u16>,
+    },
+    /// Mirrors [`SamplerFailureRecovery::WaitOutRateLimit`].
+    WaitOutRateLimit {
+        retry_after_secs: Option<u64>,
     },
 }
 
