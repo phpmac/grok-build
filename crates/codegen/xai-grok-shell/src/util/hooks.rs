@@ -88,7 +88,17 @@ timeout = 5
         assert_eq!(layer.source_name(), "requirements/system");
 
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
-        let (registry, errors) = assemble_hooks(&layers, None, &compat, false);
+        let (registry, errors) = xai_grok_hooks::discovery::assemble_hooks(
+            &layers,
+            DiscoveryOptions {
+                git_root: None,
+                grok_home: None,
+                home: None,
+                compat: compat.hooks(),
+                claude_import: xai_grok_config::ClaudeImport::NotImported,
+                trust: Trust::Untrusted,
+            },
+        );
         assert!(errors.is_empty(), "errors: {errors:?}");
 
         for (event, command) in [
@@ -184,7 +194,17 @@ timeout = 5
         // Registry level through the real assembly: all three events register with requirements provenance
         // The byte-identical PreToolUse duplicate collapses to one effective hook
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
-        let (registry, errors) = assemble_hooks(&layers, None, &compat, false);
+        let (registry, errors) = xai_grok_hooks::discovery::assemble_hooks(
+            &layers,
+            DiscoveryOptions {
+                git_root: None,
+                grok_home: None,
+                home: None,
+                compat: compat.hooks(),
+                claude_import: xai_grok_config::ClaudeImport::NotImported,
+                trust: Trust::Untrusted,
+            },
+        );
         assert!(errors.is_empty(), "errors: {errors:?}");
         for event in [
             HookEventName::SessionStart,
@@ -224,8 +244,17 @@ timeout = 5
         .unwrap();
 
         let compat = xai_grok_tools::types::compat::CompatConfig::default();
-        let (registry, errors) =
-            assemble_hooks(&[], Some(root.path()), &compat, /*trusted*/ true);
+        let (registry, errors) = xai_grok_hooks::discovery::assemble_hooks(
+            &[],
+            DiscoveryOptions {
+                git_root: Some(root.path()),
+                grok_home: None,
+                home: None,
+                compat: compat.hooks(),
+                claude_import: xai_grok_config::ClaudeImport::NotImported,
+                trust: Trust::Trusted,
+            },
+        );
 
         assert!(
             !registry.all_hooks().iter().any(|h| {
@@ -238,7 +267,7 @@ timeout = 5
         assert!(
             errors.iter().any(|e| matches!(
                 e,
-                HookError::ReadFile { path, .. } if path == &disguised
+                HookError::ReadFile { path, .. } if *path == disguised
             )),
             "reading the disguised directory as a settings file must surface ReadFile; got {errors:?}"
         );

@@ -6289,6 +6289,7 @@ fn search_mode_keeps_a_page_flipped_peek_lease() {
         crate::views::dashboard::WorkspaceRowInputs {
             workspace: None,
             provisional: &[],
+            cwd: None,
         },
         None,
         false,

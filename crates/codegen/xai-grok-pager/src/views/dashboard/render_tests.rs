@@ -230,6 +230,7 @@ fn workspace_dashboard_renders_snapshot_member_with_archive_control() {
         crate::views::dashboard::WorkspaceRowInputs {
             workspace: Some(&workspace),
             provisional: &[],
+            cwd: None,
         },
         None,
         false,
@@ -293,6 +294,7 @@ fn dashboard_toast_paints_while_peek_is_open() {
         crate::views::dashboard::WorkspaceRowInputs {
             workspace: None,
             provisional: &[crate::app::agent::AgentId(0)],
+            cwd: None,
         },
         None,
         false,
@@ -353,6 +355,7 @@ fn narrow_workspace_dashboard_keeps_archive_hit_target() {
         crate::views::dashboard::WorkspaceRowInputs {
             workspace: Some(&workspace),
             provisional: &[],
+            cwd: None,
         },
         None,
         false,
@@ -394,6 +397,7 @@ fn open_previous_actions_button_is_v2_only_and_follows_new_agent() {
             crate::views::dashboard::WorkspaceRowInputs {
                 workspace: workspace_dashboard_enabled.then_some(&workspace),
                 provisional: &[],
+                cwd: None,
             },
             None,
             false,
@@ -537,6 +541,7 @@ fn dashboard_session_picker_renders_simple_open_surface() {
         crate::views::dashboard::WorkspaceRowInputs {
             workspace: Some(&workspace),
             provisional: &[],
+            cwd: None,
         },
         Some(&mut surface),
         false,
@@ -622,6 +627,7 @@ fn dashboard_session_picker_search_focus_keeps_the_selected_row() {
         crate::views::dashboard::WorkspaceRowInputs {
             workspace: Some(&workspace),
             provisional: &[],
+            cwd: None,
         },
         Some(&mut surface),
         false,
@@ -890,6 +896,7 @@ fn chrome_hit_areas_do_not_survive_a_frame_that_skips_the_header() {
             crate::views::dashboard::WorkspaceRowInputs {
                 workspace: Some(&workspace),
                 provisional: &[],
+                cwd: None,
             },
             None,
             false,

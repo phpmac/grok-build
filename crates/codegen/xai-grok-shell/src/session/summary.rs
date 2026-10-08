@@ -257,6 +257,7 @@ mod tests {
         let mut generator = SummaryGenerator::new(SummaryConfig {
             sampling_client,
             model: String::new(),
+            language: None,
             persistence_tx: tx.downgrade(),
         });
         assert!(generator.is_idle());

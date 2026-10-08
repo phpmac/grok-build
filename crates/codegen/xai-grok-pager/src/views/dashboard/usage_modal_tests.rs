@@ -47,6 +47,7 @@ fn render_with_modal(
         crate::views::dashboard::WorkspaceRowInputs {
             workspace: None,
             provisional: &[],
+            cwd: None,
         },
         None,
         false,

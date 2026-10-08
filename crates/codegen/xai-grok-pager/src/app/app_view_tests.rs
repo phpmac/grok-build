@@ -6108,6 +6108,7 @@ fn dashboard_picker_esc_after_search_click_restores_the_selection() {
         crate::views::dashboard::WorkspaceRowInputs {
             workspace: Some(&workspace),
             provisional: &[],
+            cwd: None,
         },
         Some(surface),
         false,

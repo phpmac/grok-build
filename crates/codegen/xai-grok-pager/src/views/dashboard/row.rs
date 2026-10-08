@@ -744,6 +744,7 @@ mod tests {
             WorkspaceRowInputs {
                 workspace: workspace.as_ref(),
                 provisional,
+                cwd: None,
             },
             &Filter::None,
             None,
@@ -1835,6 +1836,7 @@ mod tests {
             WorkspaceRowInputs {
                 workspace: Some(&workspace),
                 provisional: &[],
+                cwd: None,
             },
             &Filter::Substring("l".into()),
             None,
