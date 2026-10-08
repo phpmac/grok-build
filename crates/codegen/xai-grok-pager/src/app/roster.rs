@@ -86,6 +86,28 @@ pub fn parse_roster_list_response(body: &str) -> Option<RosterListResponse> {
     serde_json::from_value::<RosterListResponse>(payload.clone()).ok()
 }
 
+/// Dashboard roster 只保留当前目录 (含同 repo worktree 兄弟) 的行; leader 聚合/注册中心可能带来其他项目的会话, 本地设计按 cwd 收口.
+pub(crate) fn retain_project_scoped(rows: &mut Vec<RosterEntry>, cwd: &std::path::Path) {
+    let keys = xai_grok_shell::session::merge::cwd_scope_keys(cwd);
+    rows.retain(|r| keys.iter().any(|k| r.cwd.trim_end_matches('/') == k.as_str()));
+}
+
+/// [`retain_project_scoped`] 的 owned 形式, 供装载入口直接替换整份 roster.
+pub(crate) fn retain_project_scoped_owned(
+    mut rows: Vec<RosterEntry>,
+    cwd: &std::path::Path,
+) -> Vec<RosterEntry> {
+    retain_project_scoped(&mut rows, cwd);
+    rows
+}
+
+/// 单行版本: 该会话行是否属于当前目录作用域 (含同 repo worktree 兄弟目录).
+pub(crate) fn cwd_in_scope(row_cwd: &str, cwd: &std::path::Path) -> bool {
+    let keys = xai_grok_shell::session::merge::cwd_scope_keys(cwd);
+    keys.iter()
+        .any(|k| row_cwd.trim_end_matches('/') == k.as_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,6 +238,24 @@ mod tests {
             parsed.sessions.first().map(|s| s.session_id.as_str()),
             Some("s1")
         );
+    }
+
+    /// Dashboard roster 只保留当前目录 (含同 repo worktree 兄弟) 的行; leader 聚合/注册中心可能带来其他项目的会话.
+    #[test]
+    fn retain_project_scoped_drops_other_project_rows() {
+        let mk = |id: &str, cwd: &str| -> RosterEntry {
+            serde_json::from_value(serde_json::json!({
+                "sessionId": id,
+                "cwd": cwd,
+                "activity": "idle",
+                "resident": false,
+            }))
+            .expect("entry parses")
+        };
+        let mut rows = vec![mk("same", "/Users/me/proj/"), mk("sibling", "/Users/me/other")];
+        retain_project_scoped(&mut rows, std::path::Path::new("/Users/me/proj"));
+        let ids: Vec<&str> = rows.iter().map(|r| r.session_id.as_str()).collect();
+        assert_eq!(ids, ["same"]);
     }
 
     /// Round-trip for `x.ai/sessions/changed`: serialize the agent's `RosterChanged` as `emit_roster_changed` does (bare params, no envelope).

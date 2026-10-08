@@ -426,6 +426,10 @@ pub(super) fn handle_sessions_changed(notif: &acp::ExtNotification, app: &mut Ap
     };
     let mut affected = false;
     for entry in changed.upserted {
+        // 本地设计: fleet 广播的 upsert 按当前目录收口, 其他项目的会话不进 Dashboard
+        if !crate::app::roster::cwd_in_scope(&entry.cwd, &app.cwd) {
+            continue;
+        }
         app.upsert_roster_entry(entry);
         affected = true;
     }

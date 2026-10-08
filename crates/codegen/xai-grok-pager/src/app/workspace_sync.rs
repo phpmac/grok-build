@@ -118,6 +118,7 @@ impl WorkspaceRowSource {
         WorkspaceRowInputs {
             workspace: self.workspace.as_ref(),
             provisional: &self.provisional,
+            cwd: None,
         }
     }
 }

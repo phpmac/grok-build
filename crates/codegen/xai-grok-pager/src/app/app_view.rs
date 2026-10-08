@@ -5089,6 +5089,9 @@ impl AppView {
                                         self.home_session_agent,
                                         self.workspace_dashboard_enabled,
                                     );
+                                let mut row_inputs = workspace_rows.inputs();
+                                // 本地设计: store 成员行按当前目录收口 (welcome banner 与 Agent Dashboard 同源)
+                                row_inputs.cwd = Some(self.cwd.as_path());
                                 let dash_cursor = crate::views::dashboard::render_dashboard(
                                     f.buffer_mut(),
                                     view_area,
@@ -5098,7 +5101,7 @@ impl AppView {
                                     pending_hint,
                                     dashboard_roster,
                                     self.workspace_dashboard_enabled,
-                                    workspace_rows.inputs(),
+                                    row_inputs,
                                     self.dashboard_session_picker.as_mut(),
                                     self.dashboard_sessions_loading,
                                     dash_upgrade_cta,

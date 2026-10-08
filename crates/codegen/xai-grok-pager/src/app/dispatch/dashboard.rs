@@ -1692,7 +1692,8 @@ pub(super) fn workspace_rows(
         app.home_session_agent,
         app.workspace_dashboard_enabled,
     );
-    let inputs = source.inputs();
+    let mut inputs = source.inputs();
+    inputs.cwd = Some(app.cwd.as_path());
     let rows = crate::views::dashboard::build_rows_with_workspace(
         &app.agents,
         inputs,

@@ -109,13 +109,19 @@ pub(crate) fn retain_matching_cwd(remote: &mut Vec<SessionRecord>, keys: &[Strin
 /// FleetView/Dashboard 的 Dormant 会话按启动目录限定: 当前目录拼写 + 同 repo 的 worktree 兄弟目录.
 /// 上游默认全盘取最近 200 条, 同级项目的会话标题会混进 Dashboard, 属跨目录泄露, 本地设计收窄.
 pub(crate) fn retain_project_scoped_summaries(summaries: &mut Vec<Summary>, cwd: &std::path::Path) {
+    let keys = cwd_scope_keys(cwd);
+    retain_summaries_matching_cwd_keys(summaries, &keys);
+}
+
+/// cwd 作用域键集 (当前目录拼写 + 同 repo 的 worktree 兄弟目录), 供跨 crate 的展示层过滤 roster 行复用.
+pub fn cwd_scope_keys(cwd: &std::path::Path) -> Vec<String> {
     let mut keys = cwd_match_keys(&cwd.to_string_lossy());
     if let Ok(siblings) =
         crate::session::worktree::candidate_worktree_cwds_for_same_repo(cwd)
     {
         keys.extend(siblings);
     }
-    retain_summaries_matching_cwd_keys(summaries, &keys);
+    keys
 }
 
 /// Pure cwd-key matching for [`retain_project_scoped_summaries`].

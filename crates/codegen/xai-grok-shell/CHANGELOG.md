@@ -2,15 +2,19 @@
 
 ## Fixes
 
-- **会话列表跨目录泄露收口 (三处)**:
+- **会话列表跨目录泄露收口 (六处)**:
   - Dashboard/FleetView: `build_roster` 原全盘扫最近 200 条 Dormant 会话, 同级项目 (ARL/FishEye 等) 标题混入; 新增 `merge::retain_project_scoped_summaries` 按启动目录 + 同 repo worktree 兄弟目录过滤.
   - 非 git 目录远程全放行: `fetch_lanes` 原在 `repo_urls` 为空 (非 git / 无 remote) 时全量合并注册中心会话; 现清空远程 lane, 无法归因 repo 的远程会话不放行.
   - picker 空目录放宽: TUI browse 原发 `allowRelax: true` 触发 `ListScope::Repo/All` 放宽; 现不再发送, 列表严格限当前目录.
+  - Dashboard roster 装载: `RosterLoaded` / `DashboardSessionsLoaded` 两个入口统一按当前目录收口 (`app/roster.rs` `retain_project_scoped`).
+  - `x.ai/sessions/changed` 广播: fleet upsert 行按当前目录收口 (`handle_sessions_changed`), 其他进程的活会话不再经广播混入.
+  - workspace store 成员行: `~/.grok/dashboard/workspace.db` 聚合了所有终端进程的会话, `build_rows_with_workspace` 渲染成员行按当前目录收口 (welcome banner 与 Agent Dashboard 同源), 实测这是 1.28.1 首版仍泄露的根因.
 
 ## Notes
 
 - 上游无新增提交 (SOURCE_REV 559751fd 不变), 本版为本地变更发版.
 - 产品版本 1.28.0 -> 1.28.1.
+- 修复验证方式: PTY 驱动真实 TUI 打开 Dashboard, 抓屏断言外项目标题零命中, 本目录会话正常显示.
 
 # 1.28.0 - 2026-10-07
 

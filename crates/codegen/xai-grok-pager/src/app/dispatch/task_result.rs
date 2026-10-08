@@ -749,7 +749,8 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             query,
         ),
         TaskResult::RosterLoaded { sessions } => {
-            app.leader_roster = sessions;
+            // 本地设计: leader 聚合的 fleet 行按当前目录收口, 其他项目的会话 (含其他进程的活会话) 不进 Dashboard
+            app.leader_roster = crate::app::roster::retain_project_scoped_owned(sessions, &app.cwd);
             app.dashboard_sessions_loading = false;
             vec![]
         }
@@ -759,7 +760,9 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             vec![]
         }
         TaskResult::DashboardSessionsLoaded { sessions } => {
-            app.dashboard_local_sessions = sessions;
+            // 本地设计: 本地会话面板同样按当前目录收口
+            app.dashboard_local_sessions =
+                crate::app::roster::retain_project_scoped_owned(sessions, &app.cwd);
             app.dashboard_sessions_loading = false;
             vec![]
         }

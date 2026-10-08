@@ -106,6 +106,8 @@ pub(crate) struct WorkspaceRowInputs<'a> {
     pub workspace: Option<&'a crate::app::workspace_layout::WorkspaceView>,
     /// Live top-level agents with no committed member yet; `crate::app::workspace_sync` decides which qualify.
     pub provisional: &'a [AgentId],
+    /// 当前目录作用域; store 聚合了所有进程的会话, 非当前目录 (含同 repo worktree) 的成员行按本地设计不渲染.
+    pub cwd: Option<&'a std::path::Path>,
 }
 impl WorkspaceRowInputs<'_> {
     pub fn grouping(&self) -> super::state::Grouping {
@@ -149,6 +151,11 @@ pub(crate) fn build_rows_with_workspace(
         .into_iter()
         .flat_map(|workspace| workspace.members.iter())
         .filter(|member| matches!(member.kind, xai_grok_dashboard_store::MemberKind::Build))
+        .filter(|member| {
+            inputs.cwd.map_or(true, |cwd| {
+                crate::app::roster::cwd_in_scope(member.cwd.as_deref().unwrap_or(""), cwd)
+            })
+        })
         .filter_map(|member| {
             let live = live_by_session.get(member.session_id.as_ref()).copied();
             let is_pinned = workspace_member_is_pinned(member);
