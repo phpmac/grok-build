@@ -227,6 +227,9 @@ fn wedged_child_handle() -> (
         registry_write_order: Default::default(),
         current_prompt_id: std::sync::Arc::new(std::sync::Mutex::new(None)),
         active_work: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        workflow_tracker: std::sync::Arc::new(parking_lot::Mutex::new(
+            crate::session::workflow::tracker::WorkflowTracker::default(),
+        )),
         pending_interactions: std::sync::Arc::new(std::sync::Mutex::new(HashMap::new())),
         info: SessionInfo {
             id: acp::SessionId::new("test"),

@@ -2442,6 +2442,7 @@ pub(crate) async fn spawn_session_actor(
         registry_write_order: Default::default(),
         pending_interactions,
         active_work: active_work.clone(),
+        workflow_tracker: workflow_tracker.clone(),
         info: session_info,
         max_turns,
         resolved_tool_overrides,

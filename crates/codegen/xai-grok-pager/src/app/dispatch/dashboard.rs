@@ -526,7 +526,7 @@ pub(super) fn dispatch_dashboard_overlay_stop(app: &mut AppView) -> Vec<Effect> 
                 } else {
                     app.agents
                         .get_mut(&id)
-                        .and_then(stop_top_level_activity)
+                        .and_then(|agent| stop_top_level_activity(id, agent))
                         .unwrap_or_default()
                 }
             }
@@ -542,6 +542,18 @@ pub(super) fn dispatch_dashboard_overlay_stop(app: &mut AppView) -> Vec<Effect> 
         .is_some_and(|agent| agent.arm_dashboard_stop())
     {
         return dispatch_cancel_turn(app);
+    }
+    // V1 与 V2 对齐: 背景工作 (workflow/bg task/loop/队列) 先停并保留会话; 空闲才走关闭.
+    if app
+        .agents
+        .get(&id)
+        .is_some_and(DashboardStopPlan::would_stop_anything)
+    {
+        return app
+            .agents
+            .get_mut(&id)
+            .and_then(|agent| stop_top_level_activity(id, agent))
+            .unwrap_or_default();
     }
     let neighbor =
         dashboard_neighbor_row(app, &crate::views::dashboard::DashboardRowId::TopLevel(id));
@@ -1788,7 +1800,7 @@ pub(super) fn dispatch_dashboard_stop(app: &mut AppView) -> Vec<Effect> {
                     DashboardStopReadiness::Stoppable => app
                         .agents
                         .get_mut(&id)
-                        .and_then(stop_top_level_activity)
+                        .and_then(|agent| stop_top_level_activity(id, agent))
                         .unwrap_or_default(),
                     DashboardStopReadiness::Busy => vec![],
                 };
@@ -1797,7 +1809,7 @@ pub(super) fn dispatch_dashboard_stop(app: &mut AppView) -> Vec<Effect> {
                 return vec![];
             };
             if !crate::views::dashboard::classify_top_level(agent).allows_delete() {
-                let stopped = stop_top_level_activity(agent);
+                let stopped = stop_top_level_activity(id, agent);
                 if let Some(d) = app.dashboard.as_mut() {
                     d.delete_confirm = None;
                 }
@@ -1866,6 +1878,8 @@ pub(super) struct DashboardStopPlan {
     cancel_foreground: bool,
     running_background_tasks: Vec<String>,
     scheduled_tasks: Vec<String>,
+    /// 可停止的 active workflow 名单: stop 键对 workflow-only 会话必须有动作, 不能静默.
+    workflow_names: Vec<String>,
     discard_queued_prompts: bool,
 }
 impl DashboardStopPlan {
@@ -1890,6 +1904,16 @@ impl DashboardStopPlan {
             } else {
                 Vec::new()
             },
+            workflow_names: if has_session {
+                agent
+                    .workflow_runs
+                    .iter()
+                    .filter(|run| run.can_stop())
+                    .map(|run| run.name.clone())
+                    .collect()
+            } else {
+                Vec::new()
+            },
             discard_queued_prompts: !agent.session.pending_prompts.is_empty(),
         }
     }
@@ -1902,13 +1926,18 @@ impl DashboardStopPlan {
             && (!agent.session.state.is_idle()
                 || agent.wake_turn_active()
                 || agent.session.has_running_bg_tasks()
-                || !agent.session.scheduled_tasks.is_empty()))
+                || !agent.session.scheduled_tasks.is_empty()
+                || agent
+                    .workflow_runs
+                    .iter()
+                    .any(|run| run.can_stop())))
             || !agent.session.pending_prompts.is_empty()
     }
     pub(super) fn is_empty(&self) -> bool {
         !self.cancel_foreground
             && self.running_background_tasks.is_empty()
             && self.scheduled_tasks.is_empty()
+            && self.workflow_names.is_empty()
             && !self.discard_queued_prompts
     }
 }
@@ -1930,7 +1959,10 @@ pub(crate) fn dashboard_stop_readiness(
         DashboardStopReadiness::Busy
     }
 }
-fn stop_top_level_activity(agent: &mut crate::app::agent_view::AgentView) -> Option<Vec<Effect>> {
+fn stop_top_level_activity(
+    agent_id: crate::app::agent::AgentId,
+    agent: &mut crate::app::agent_view::AgentView,
+) -> Option<Vec<Effect>> {
     let plan = DashboardStopPlan::for_agent(agent);
     if plan.is_empty() {
         return None;
@@ -1970,6 +2002,22 @@ fn stop_top_level_activity(agent: &mut crate::app::agent_view::AgentView) -> Opt
                 session_id: session_id.clone(),
                 task_id,
             });
+        }
+        // 与 Tasks 面板 [stop] 同一条链路: /workflow stop 由 shell 执行, 状态经 workflow_ingest 回流.
+        // 前台回合取消当拍只取消, workflow 留给下一次 stop, 与 V2 arm 路径同拍语义 (避免提示词排在取消回合后遭队列清理).
+        if !plan.cancel_foreground {
+            for name in plan.workflow_names {
+                let prompt_id = uuid::Uuid::new_v4().to_string();
+                // 登记 self-originated, shell 的 Stopped 回包才不会把会话翻成 viewer 语义.
+                agent.note_self_originated_prompt(&prompt_id);
+                effects.push(Effect::SendPrompt {
+                    agent_id,
+                    session_id: session_id.clone(),
+                    text: format!("/workflow stop {name}"),
+                    prompt_id,
+                    skill_token_ranges: Vec::new(),
+                });
+            }
         }
     }
     if plan.discard_queued_prompts {

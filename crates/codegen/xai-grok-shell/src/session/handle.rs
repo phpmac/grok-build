@@ -58,6 +58,9 @@ pub struct SessionHandle {
     /// Shared `Arc` with the actor (insert on issue, remove on resolve); never persisted.
     pub pending_interactions: crate::session::pending_interaction::PendingInteractions,
     pub(crate) active_work: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    /// Session 的 workflow 运行追踪器, 与 actor/manager 共享同一 Arc. 供 roster activity 把跑动中的 workflow 判为 Working.
+    pub(crate) workflow_tracker:
+        std::sync::Arc<parking_lot::Mutex<crate::session::workflow::tracker::WorkflowTracker>>,
     pub info: crate::session::info::Info,
     /// `None` means unlimited.
     pub max_turns: Option<usize>,

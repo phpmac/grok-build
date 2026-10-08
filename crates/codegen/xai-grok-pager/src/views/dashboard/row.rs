@@ -391,7 +391,7 @@ pub fn classify_top_level(agent: &AgentView) -> RowState {
     RowState::Idle
 }
 /// Whether `agent` has live background work that keeps it out of the `Idle` group even when its
-/// turn is idle.
+/// turn is idle. active workflow run 也算背景工作: 空闲会话挂着跑动中的 workflow 时不得归入 Idle.
 pub fn has_background_work(agent: &AgentView) -> bool {
     agent
         .session
@@ -399,6 +399,7 @@ pub fn has_background_work(agent: &AgentView) -> bool {
         .values()
         .any(|t| t.status == crate::app::agent::BgTaskStatus::Running)
         || !agent.session.scheduled_tasks.is_empty()
+        || agent.workflow_runs.iter().any(|run| run.is_active())
 }
 /// Sanitise every string derived from backend / model-controlled content before returning.
 /// The dashboard's renderer paints raw via `set_string`, which preserves embedded escape sequences in the ratatui buffer.
@@ -1773,6 +1774,50 @@ mod tests {
             Some("Loading…"),
             "replay loading must keep its activity",
         );
+    }
+    /// 空闲会话挂一个 active workflow 判 Working, 否则 Working 组与 Working 筛选漏掉该会话.
+    #[test]
+    fn active_workflow_run_classifies_as_working() {
+        let mut agent = make_idle_agent_with_model(None);
+        agent
+            .workflow_runs
+            .push(make_workflow_run("deep-research", "active"));
+        assert!(has_background_work(&agent));
+        assert_eq!(classify_top_level(&agent), RowState::Working);
+    }
+    /// 终态 (complete) workflow 不算背景工作, 会话保持 Idle.
+    #[test]
+    fn terminal_workflow_run_keeps_agent_idle() {
+        let mut agent = make_idle_agent_with_model(None);
+        agent
+            .workflow_runs
+            .push(make_workflow_run("old-scan", "complete"));
+        assert!(!has_background_work(&agent));
+        assert_eq!(classify_top_level(&agent), RowState::Idle);
+    }
+    /// 照抄 tasks_pane / agent_view 测试的快照构造; `received_at` 是进程内 [`Instant`], 只能取当前时刻.
+    fn make_workflow_run(name: &str, status: &str) -> crate::views::workflows::WorkflowRunSnapshot {
+        crate::views::workflows::WorkflowRunSnapshot {
+            run_id: format!("wf_{name}"),
+            name: name.to_string(),
+            objective: "obj".to_string(),
+            status: status.to_string(),
+            management_available: true,
+            builtin: false,
+            phases: Vec::new(),
+            current_phase: None,
+            agents: Vec::new(),
+            agent_budget: None,
+            agents_used: 0,
+            agents_reserved: 0,
+            agents_remaining: None,
+            agent_usage_incomplete: false,
+            active_agents: 0,
+            elapsed_ms: 1_000,
+            received_at: std::time::Instant::now(),
+            pause_message: None,
+            result_summary: None,
+        }
     }
     /// Roster-only idle / dormant sessions classify as `Inactive`, the dedicated section for sessions
     /// not loaded in this pager. Local idle agents stay `Idle`; `classify_top_level` never returns

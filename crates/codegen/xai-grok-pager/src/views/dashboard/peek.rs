@@ -712,6 +712,10 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
             None => return "Working".to_string(),
         }
     }
+    // 回合空闲但背景工作仍在跑 (workflow/bg task/loop): 扫描出来的旧回复标签已过时, 直接报 Working.
+    if !running && super::row::has_background_work(agent) {
+        return "Working".to_string();
+    }
     let len = agent.scrollback.len();
     for idx in (0..len).rev() {
         let Some(entry) = agent.scrollback.entry(idx) else {

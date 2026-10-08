@@ -393,7 +393,7 @@ impl MvpAgent {
         id: &acp::SessionId,
     ) -> crate::agent::roster::RosterActivity {
         use crate::agent::roster::RosterActivity;
-        let (needs_input, turn_running) = self
+        let (needs_input, turn_running, workflow_active) = self
             .resident_handle(id)
             .map(|h| {
                 let needs_input = h
@@ -406,13 +406,14 @@ impl MvpAgent {
                     .lock()
                     .map(|g| g.is_some())
                     .unwrap_or(false);
-                (needs_input, turn_running)
+                let workflow_active = h.workflow_tracker.lock().has_active_run();
+                (needs_input, turn_running, workflow_active)
             })
-            .unwrap_or((false, false));
+            .unwrap_or((false, false, false));
         if needs_input {
             return RosterActivity::NeedsInput;
         }
-        if turn_running {
+        if turn_running || workflow_active {
             return RosterActivity::Working;
         }
         match self.session_registry.live(id) {
@@ -645,4 +646,24 @@ pub(crate) struct RegistrySnapshot {
     pub subagent_queued: usize,
     pub workspace_bindings: Option<usize>,
     pub workspace_activity_sessions: Option<usize>,
+}
+
+/// Turn-end delta 的 activity: pending 交互优先, 其次 workflow 仍在跑报 Working, 否则 Idle.
+/// 不读 current_prompt_id (此刻回合已收尾), 也不查 registry (resident_activity 的 live-state 分支只服务轮询).
+pub(super) fn turn_end_activity(
+    handle: &crate::session::SessionHandle,
+) -> crate::agent::roster::RosterActivity {
+    use crate::agent::roster::RosterActivity;
+    if handle
+        .pending_interactions
+        .lock()
+        .map(|g| !g.is_empty())
+        .unwrap_or(false)
+    {
+        RosterActivity::NeedsInput
+    } else if handle.workflow_tracker.lock().has_active_run() {
+        RosterActivity::Working
+    } else {
+        RosterActivity::Idle
+    }
 }

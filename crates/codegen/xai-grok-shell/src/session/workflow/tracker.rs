@@ -209,6 +209,13 @@ struct TrackedRun {
 }
 
 impl WorkflowTracker {
+    /// 是否存在 Active 状态的 run. 恢复重建 (from_snapshot) 会把 persisted Active 改写为 Interrupted, 无 stale Active.
+    pub(crate) fn has_active_run(&self) -> bool {
+        self.runs
+            .iter()
+            .any(|run| run.state.status == WorkflowRunStatus::Active)
+    }
+
     pub(crate) fn start_run(
         &mut self,
         run_id: String,

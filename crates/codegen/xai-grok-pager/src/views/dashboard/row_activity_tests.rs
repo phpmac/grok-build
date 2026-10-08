@@ -284,18 +284,26 @@ fn live_chips_update_on_completion_without_changing_row_classification() {
 }
 
 #[test]
-fn subagent_and_workflow_only_keep_existing_idle_classification() {
+fn running_subagent_only_keeps_existing_idle_classification() {
     let mut agent = agent();
     agent
         .subagent_sessions
         .insert("child".to_owned(), running_subagent_info("child"));
+    let row = row(agent);
+    assert_eq!(
+        (RowState::Idle, vec![RowBadge::Subagents(1)]),
+        (row.state, row.badges)
+    );
+}
+
+/// active workflow 算背景工作: 空闲会话判 Working 并保留 Workflows 徽标.
+#[test]
+fn active_workflow_run_classifies_as_working_with_badge() {
+    let mut agent = agent();
     agent.workflow_runs.push(workflow("active"));
     let row = row(agent);
     assert_eq!(
-        (
-            RowState::Idle,
-            vec![RowBadge::Subagents(1), RowBadge::Workflows(1)]
-        ),
+        (RowState::Working, vec![RowBadge::Workflows(1)]),
         (row.state, row.badges)
     );
 }

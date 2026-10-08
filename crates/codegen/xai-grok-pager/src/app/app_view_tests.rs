@@ -4297,6 +4297,64 @@ fn stale_idle_rewind_arm_never_fires_on_busy_agent() {
         "the stale arm must be dropped"
     );
 }
+/// 回合空闲但 active workflow 在跑时, armed 的 Rewind 同样不得落下来 (workflow 等同回合运行中).
+#[test]
+fn stale_idle_rewind_arm_never_fires_while_workflow_active() {
+    let mut app = test_app_with_agent();
+    let id = super::super::agent::AgentId(0);
+    {
+        let agent = app.agents.get_mut(&id).unwrap();
+        agent.active_pane = crate::views::agent::ActivePane::Prompt;
+        agent.vim_mode = true;
+        agent
+            .scrollback
+            .push_block(crate::scrollback::block::RenderBlock::user_prompt(
+                "earlier",
+            ));
+        agent
+            .workflow_runs
+            .push(crate::views::workflows::WorkflowRunSnapshot {
+                run_id: "wf_guard".to_owned(),
+                name: "deep-research".to_owned(),
+                objective: String::new(),
+                status: "active".to_owned(),
+                management_available: true,
+                builtin: false,
+                phases: Vec::new(),
+                current_phase: None,
+                agents: Vec::new(),
+                agent_budget: None,
+                agents_used: 0,
+                agents_reserved: 0,
+                agents_remaining: None,
+                agent_usage_incomplete: false,
+                active_agents: 0,
+                elapsed_ms: 0,
+                received_at: std::time::Instant::now(),
+                pause_message: None,
+                result_summary: None,
+            });
+    }
+    let outcome = app.handle_input(&key_event(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(matches!(outcome, InputOutcome::Changed));
+    assert!(matches!(
+        app.pending_action.as_ref().expect("arm rewind").action,
+        Action::RewindShowPicker
+    ));
+    let outcome = app.handle_input(&key_event(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(
+        matches!(outcome, InputOutcome::Changed),
+        "Esc while a workflow is active must swallow, got {outcome:?}",
+    );
+    assert!(
+        !matches!(outcome, InputOutcome::Action(Action::RewindShowPicker)),
+        "the stale rewind arm must not fire while a workflow runs",
+    );
+    assert!(
+        app.pending_action.is_none(),
+        "the stale arm must be dropped"
+    );
+}
 #[test]
 fn stale_idle_clear_arm_never_fires_on_wake_turn() {
     let mut app = test_app_with_agent();

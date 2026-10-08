@@ -1233,6 +1233,9 @@ pub(super) fn make_test_handle(
             std::collections::HashMap::new(),
         )),
         active_work: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        workflow_tracker: std::sync::Arc::new(parking_lot::Mutex::new(
+            crate::session::workflow::tracker::WorkflowTracker::default(),
+        )),
         info: crate::session::info::Info {
             id: acp::SessionId::new("test"),
             cwd: "/tmp".to_string(),
@@ -3439,6 +3442,47 @@ async fn resident_activity_reports_needs_input_when_pending() {
     assert_eq!(entry.activity, RosterActivity::NeedsInput);
     pending.lock().unwrap().clear();
     assert_eq!(agent.resident_activity(&sid), RosterActivity::Working);
+}
+/// `resident_activity` returns `Working` when the session's workflow tracker holds an Active run,
+/// even though the parent turn is idle (the workflow keeps the session busy on the roster wire).
+#[tokio::test]
+async fn resident_activity_reports_working_when_workflow_active() {
+    use crate::agent::roster::RosterActivity;
+    let agent = build_minimal_agent_for_tests();
+    let sid = acp::SessionId::new("sess-workflow");
+    let handle = make_test_handle("grok-3", false, None);
+    handle.workflow_tracker.lock().start_run(
+        "run-1".to_string(),
+        "deep-research".to_string(),
+        String::new(),
+        Vec::new(),
+        None,
+        None,
+    );
+    agent.insert_resident(&sid, handle);
+    assert_eq!(agent.resident_activity(&sid), RosterActivity::Working);
+}
+/// Turn-end delta: pending 交互报 NeedsInput, workflow 仍 active 报 Working, 否则 Idle.
+#[tokio::test]
+async fn turn_end_activity_reports_working_when_workflow_active() {
+    use crate::agent::roster::RosterActivity;
+    let handle = make_test_handle("grok-3", false, None);
+    assert_eq!(
+        super::session_lifecycle::turn_end_activity(&handle),
+        RosterActivity::Idle
+    );
+    handle.workflow_tracker.lock().start_run(
+        "run-1".to_string(),
+        "deep-research".to_string(),
+        String::new(),
+        Vec::new(),
+        None,
+        None,
+    );
+    assert_eq!(
+        super::session_lifecycle::turn_end_activity(&handle),
+        RosterActivity::Working
+    );
 }
 /// Drain the agent gateway, returning the first `x.ai/sessions/changed` payload that carries an upserted entry.
 /// Unrelated notifications parse into an empty `RosterChanged` and are ignored.

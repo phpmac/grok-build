@@ -1,3 +1,18 @@
+# 1.28.3 - 2026-10-09
+
+## Fixes
+
+- **Dashboard Working 组/筛选漏掉运行中 workflow 的会话**: 此前 `classify_top_level` 只看 bg_tasks 与 scheduled_tasks, 会话回合结束后仍有 active workflow 时被判 Idle, Working 筛选查不到. 现在 `has_background_work` 纳入 `workflow_runs` 的 `is_active()` 项, 判活口径与 Tasks 面板一致; peek 状态行对背景工作报 `Working` 不再停留在上一回合的 `Response`.
+- **Dashboard stop 键对 workflow-only 会话静默无动作**: `DashboardStopPlan` 新增 `workflow_names`, 经 `Effect::SendPrompt` 发 `/workflow stop <name>` (登记 self-originated prompt id, 防止回包把会话翻成 viewer 语义); V1 overlay [stop] 尾部与 V2 对齐, 先停背景工作再判断关闭; 前台回合取消当拍只取消, workflow 留给下一次 stop (与 V2 arm 路径同拍).
+- **budget_limited 停止口径对齐 shell**: `WorkflowRunSnapshot::can_stop` 与 slash 补全的 `WorkflowRunChoice::can_stop` 均排除 `budget_limited` (shell `accepts(Stop)` 必拒, 此前 Tasks 面板/workflow 详情页会对 budget_limited run 提供必失败的 stop).
+- **Rewind/ClearPrompt 的 busy 守卫纳入背景工作**: armed 的 `ClearPrompt`/`RewindShowPicker` 在 active workflow 或 running bg task 期间与回合运行中同等丢弃, 不再落到跑动中的会话头上.
+- **跨进程 roster 状态**: `SessionHandle` 共享 workflow tracker Arc; `resident_activity` 与回合结束 delta (`turn_end_activity`) 对 Active run 报 `Working`, 其他终端进程的 Dashboard 能立即看到 workflow-only 会话在 Working, 不再闪回 Idle.
+
+## Notes
+
+- 上游无新增提交 (SOURCE_REV 559751fd 不变), 本版为本地变更发版.
+- 产品版本 1.28.2 -> 1.28.3.
+
 # 1.28.2 - 2026-10-08
 
 ## Fixes

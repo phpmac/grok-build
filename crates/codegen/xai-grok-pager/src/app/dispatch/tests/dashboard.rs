@@ -3807,6 +3807,46 @@ fn extract_response_type_tool_running_overrides_stale_response() {
     agent.scrollback.set_last_running(true);
     assert_eq!(extract_last_response_type(agent), "Working");
 }
+/// 回合空闲但挂着 active workflow 时, peek 状态行必须报 Working, 不能停在上一回合的 Response.
+#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[test]
+fn peek_label_reports_working_for_active_workflow_when_idle() {
+    use crate::scrollback::block::RenderBlock;
+    use crate::views::dashboard::peek::extract_last_response_type;
+    let mut app = test_app_with_agent();
+    let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+    agent
+        .scrollback
+        .push_block(RenderBlock::agent_message("done"));
+    agent
+        .workflow_runs
+        .push(workflow_run_snapshot("deep-research", "active"));
+    assert_eq!(extract_last_response_type(agent), "Working");
+}
+/// V1 overlay [stop] 对 workflow-only 会话同样转发 /workflow stop, 不得静默也不得关会话.
+#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[test]
+fn v1_overlay_stop_sends_workflow_stop_for_active_workflow() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    app.workspace_dashboard_enabled = false;
+    mark_agent_nonempty(&mut app, id);
+    app.agents.get_mut(&id).unwrap().workflow_runs.push(
+        workflow_run_snapshot("deep-research", "active"),
+    );
+    ensure_dashboard_state(&mut app);
+    app.dashboard.as_mut().unwrap().attached_agent = Some(id);
+    let effects = dispatch_dashboard_overlay_stop(&mut app);
+    assert!(
+        effects.iter().any(|e| matches!(e,
+            Effect::SendPrompt { text, .. } if text == "/workflow stop deep-research")),
+        "V1 overlay stop must forward /workflow stop, got {effects:?}",
+    );
+    assert!(
+        app.agents.contains_key(&id),
+        "workflow stop must not close the session",
+    );
+}
 /// Always-Approve mode makes the next spawned agent auto-approve.
 #[serial_test::serial(GROK_AGENT_DASHBOARD)]
 #[test]
@@ -4774,6 +4814,107 @@ fn dashboard_overlay_stop_closes_session_and_returns_to_dashboard() {
     assert_eq!(
         app.dashboard.as_ref().unwrap().error_toast.as_deref(),
         Some(format!("{} Session closed", crate::glyphs::check_mark()).as_str()),
+    );
+}
+/// 测试用 WorkflowRunSnapshot 构造器, 与 tasks_pane 测试的 make_workflow_run 同一形状.
+fn workflow_run_snapshot(name: &str, status: &str) -> crate::views::workflows::WorkflowRunSnapshot {
+    crate::views::workflows::WorkflowRunSnapshot {
+        run_id: format!("wf_{name}"),
+        name: name.to_string(),
+        objective: String::new(),
+        status: status.to_string(),
+        management_available: true,
+        builtin: false,
+        phases: Vec::new(),
+        current_phase: None,
+        agents: Vec::new(),
+        agent_budget: None,
+        agents_used: 0,
+        agents_reserved: 0,
+        agents_remaining: None,
+        agent_usage_incomplete: false,
+        active_agents: 0,
+        elapsed_ms: 0,
+        received_at: std::time::Instant::now(),
+        pause_message: None,
+        result_summary: None,
+    }
+}
+/// workflow-only 会话 (回合空闲, 挂 active workflow): stop 键必须转发 /workflow stop, 不得静默也不得关会话.
+#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[test]
+fn dashboard_stop_sends_workflow_stop_for_active_workflow() {
+    let mut app = test_app_with_agent();
+    mark_agent_nonempty(&mut app, AgentId(0));
+    let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+    agent
+        .workflow_runs
+        .push(workflow_run_snapshot("deep-research", "active"));
+    ensure_dashboard_state(&mut app);
+    app
+        .dashboard
+        .as_mut()
+        .unwrap()
+        .focus_row(crate::views::dashboard::DashboardRowId::TopLevel(AgentId(0)));
+    app.active_view = ActiveView::AgentDashboard;
+    let effects = dispatch_dashboard_stop(&mut app);
+    assert!(
+        effects.iter().any(|e| matches!(e,
+            Effect::SendPrompt { text, .. } if text == "/workflow stop deep-research")),
+        "stop must forward /workflow stop to the shell, got {effects:?}",
+    );
+    assert!(
+        app.agents.contains_key(&AgentId(0)),
+        "workflow stop must not close the session",
+    );
+}
+/// 终态 workflow (complete) 不算可停工作: stop 键不产 /workflow stop, 会话走归档/关闭路径.
+#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[test]
+fn dashboard_stop_ignores_terminal_workflow() {
+    let mut app = test_app_with_agent();
+    mark_agent_nonempty(&mut app, AgentId(0));
+    let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+    agent
+        .workflow_runs
+        .push(workflow_run_snapshot("old-run", "complete"));
+    ensure_dashboard_state(&mut app);
+    app
+        .dashboard
+        .as_mut()
+        .unwrap()
+        .focus_row(crate::views::dashboard::DashboardRowId::TopLevel(AgentId(0)));
+    app.active_view = ActiveView::AgentDashboard;
+    let effects = dispatch_dashboard_stop(&mut app);
+    assert!(
+        !effects
+            .iter()
+            .any(|e| matches!(e, Effect::SendPrompt { text, .. } if text.contains("/workflow stop"))),
+        "terminal workflow must not be stopped, got {effects:?}",
+    );
+}
+/// V2 overlay [stop] 对 workflow-only 会话同样转发 /workflow stop, 不得静默或关会话.
+#[serial_test::serial(GROK_AGENT_DASHBOARD)]
+#[test]
+fn workspace_overlay_stop_sends_workflow_stop_for_active_workflow() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    app.workspace_dashboard_enabled = true;
+    mark_agent_nonempty(&mut app, id);
+    app.agents.get_mut(&id).unwrap().workflow_runs.push(
+        workflow_run_snapshot("deep-research", "active"),
+    );
+    ensure_dashboard_state(&mut app);
+    app.dashboard.as_mut().unwrap().attached_agent = Some(id);
+    let effects = dispatch_dashboard_overlay_stop(&mut app);
+    assert!(
+        effects.iter().any(|e| matches!(e,
+            Effect::SendPrompt { text, .. } if text == "/workflow stop deep-research")),
+        "V2 overlay stop must forward /workflow stop, got {effects:?}",
+    );
+    assert!(
+        app.agents.contains_key(&id),
+        "workflow stop must not close the session",
     );
 }
 /// Overlay stop on the ONLY session: the close is refused (same guard as session close), but the user still lands on the dashboard with the refusal toast surfaced there; the session itself survives.
@@ -8166,6 +8307,25 @@ fn stop_readiness_predicate_matches_the_built_plan() {
     assert!(DashboardStopPlan::would_stop_anything(agent));
     agree(agent);
     agent.session.scheduled_tasks.clear();
+    // workflow: active 可停 -> true; budget_limited/complete 不可停 -> false.
+    agent
+        .workflow_runs
+        .push(workflow_run_snapshot("wf-active", "active"));
+    assert!(DashboardStopPlan::would_stop_anything(agent));
+    agree(agent);
+    agent.workflow_runs.clear();
+    agent
+        .workflow_runs
+        .push(workflow_run_snapshot("wf-capped", "budget_limited"));
+    assert!(!DashboardStopPlan::would_stop_anything(agent));
+    agree(agent);
+    agent.workflow_runs.clear();
+    agent
+        .workflow_runs
+        .push(workflow_run_snapshot("wf-done", "complete"));
+    assert!(!DashboardStopPlan::would_stop_anything(agent));
+    agree(agent);
+    agent.workflow_runs.clear();
     agent.session.session_id = None;
     agent
         .session

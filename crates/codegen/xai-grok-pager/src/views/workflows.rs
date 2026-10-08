@@ -84,8 +84,9 @@ impl WorkflowRunSnapshot {
         )
     }
 
+    /// 与 shell 侧 accepts(Stop) 同口径: budget_limited 已完成结算, stop 会被 shell 拒绝, 不得再标可停.
     pub fn can_stop(&self) -> bool {
-        self.management_available && !self.is_terminal()
+        self.management_available && !self.is_terminal() && self.status != "budget_limited"
     }
 
     pub fn can_save(&self) -> bool {
@@ -1228,7 +1229,7 @@ mod tests {
     fn budget_limited_run_disables_bare_resume_and_explains_raised_cap_path() {
         let mut run = make_run("wf_1", "deep-research", "budget_limited");
         assert!(!run.can_resume());
-        assert!(run.can_stop());
+        assert!(!run.can_stop());
 
         let labels = footer_shortcuts(true, false, Some(&run))
             .into_iter()
@@ -1237,8 +1238,8 @@ mod tests {
         assert!(!labels.contains(&"r resume"));
 
         assert!(
-            labels.contains(&"x stop"),
-            "budget_limited is non-terminal and must keep stop"
+            !labels.contains(&"x stop"),
+            "shell rejects stop for budget_limited, so the footer must not offer it"
         );
 
         let runs = vec![&run];

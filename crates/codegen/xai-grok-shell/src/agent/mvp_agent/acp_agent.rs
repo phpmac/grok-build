@@ -1567,16 +1567,7 @@ impl acp::Agent for MvpAgent {
             }
         }
         {
-            let end_activity = if handle
-                .pending_interactions
-                .lock()
-                .map(|g| !g.is_empty())
-                .unwrap_or(false)
-            {
-                crate::agent::roster::RosterActivity::NeedsInput
-            } else {
-                crate::agent::roster::RosterActivity::Idle
-            };
+            let end_activity = super::session_lifecycle::turn_end_activity(&handle);
             self.push_roster_activity_delta(&arguments.session_id, end_activity);
         }
         let harness_trace_turns = {

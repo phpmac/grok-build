@@ -103,9 +103,10 @@ impl WorkflowRunChoice {
     }
 
     pub fn can_stop(&self) -> bool {
+        // budget_limited 已完成结算, shell 的 accepts(Stop) 必拒, 补全不得建议必失败的 stop
         !matches!(
             self.status.as_str(),
-            "interrupted" | "complete" | "failed" | "cancelled"
+            "interrupted" | "complete" | "failed" | "cancelled" | "budget_limited"
         )
     }
 

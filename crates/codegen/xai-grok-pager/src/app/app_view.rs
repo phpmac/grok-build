@@ -2480,6 +2480,9 @@ impl AppView {
                     a.session.state.is_turn_running()
                         || a.session.state.is_cancelling()
                         || a.wake_turn_active()
+                        // 背景工作期间放行会rewind/清空到跑动中的会话头上, 与回合运行中同等对待.
+                        || a.workflow_runs.iter().any(|run| run.is_active())
+                        || a.session.has_running_bg_tasks()
                 })
             );
             if !stale_idle_arm_while_busy && !pending.expired() && pending.shortcut.matches(key) {

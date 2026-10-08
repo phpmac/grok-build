@@ -2814,12 +2814,18 @@ mod tests {
                 _ => panic!("expected a workflow entry"),
             }
         }
-        for status in ["active", "paused", "budget_limited"] {
+        for status in ["active", "paused"] {
             let run = make_workflow_run("wf", status);
             assert!(run.can_stop(), "{status} run should be stoppable");
             assert!(stoppable_of(&run), "{status} row must be marked stoppable");
         }
-        for status in ["complete", "failed", "cancelled", "interrupted"] {
+        for status in [
+            "budget_limited",
+            "complete",
+            "failed",
+            "cancelled",
+            "interrupted",
+        ] {
             let run = make_workflow_run("wf", status);
             assert!(!run.can_stop(), "{status} run should not be stoppable");
             assert!(!stoppable_of(&run), "{status} row must not be stoppable");
