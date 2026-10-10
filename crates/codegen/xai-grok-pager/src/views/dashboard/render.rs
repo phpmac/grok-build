@@ -840,7 +840,9 @@ fn build_dashboard_lines<'a>(
     let mut idle_top_seen = 0usize;
     let mut pending_overflow: Option<(usize, bool)> = None;
     for (i, row) in rest.iter().enumerate() {
-        if Some(row.state) != last_top_state {
+        // 分节键用组优先级: Idle 与 Inactive 同节, 组内按更新时间混排, 组头固定用 Idle 保持折叠键稳定.
+        let band = row.state.group_priority();
+        if Some(band) != last_top_state.map(RowState::group_priority) {
             // Emit the overflow row of the group we're leaving before the new header, so it lands at the bottom of the Idle group
             if let Some((hidden, expanded)) = pending_overflow.take() {
                 out.push(DashboardLine::IdleOverflow { hidden, expanded });
@@ -849,7 +851,7 @@ fn build_dashboard_lines<'a>(
             let mut count = 0usize;
             let mut recent = 0usize;
             for r in rest.iter().skip(i) {
-                if r.state == row.state {
+                if r.state.group_priority() == band {
                     count += 1;
                     if idle_row_is_recent(r, now) {
                         recent += 1;
@@ -858,16 +860,21 @@ fn build_dashboard_lines<'a>(
                     break;
                 }
             }
+            let header_state = if band == RowState::Idle.group_priority() {
+                RowState::Idle
+            } else {
+                row.state
+            };
             out.push(DashboardLine::Header {
-                state: row.state,
+                state: header_state,
                 count,
             });
-            last_top_state = Some(row.state);
-            current_collapsed = collapsed.contains(&SectionKey::State(row.state));
+            last_top_state = Some(header_state);
+            current_collapsed = collapsed.contains(&SectionKey::State(header_state));
             // Reset or set the Idle cap for the new group
             idle_limit = None;
             idle_top_seen = 0;
-            if row.state == RowState::Idle && idle_cap_active && !current_collapsed {
+            if band == RowState::Idle.group_priority() && idle_cap_active && !current_collapsed {
                 // Keep the freshest agents: at least MAX_VISIBLE_IDLE, extended to cover everything still inside the freshness window
                 // Only fold when it hides at least MIN_IDLE_FOLD rows (a single folded row saves no space)
                 let base_limit = MAX_VISIBLE_IDLE.max(recent).min(count);

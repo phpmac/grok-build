@@ -121,6 +121,8 @@ fn persisted_row_id_invalid() {
 fn group_priority_ordering() {
     assert!(RowState::NeedsInput.group_priority() > RowState::Working.group_priority());
     assert!(RowState::Working.group_priority() > RowState::Idle.group_priority());
+    // Idle 与 Inactive 同节, 组内按更新时间混排
+    assert_eq!(RowState::Idle.group_priority(), RowState::Inactive.group_priority());
     assert!(RowState::Idle.group_priority() > RowState::Completed.group_priority());
     assert!(RowState::Completed.group_priority() > RowState::Failed.group_priority());
 }
@@ -4369,26 +4371,23 @@ fn section_keys_collapse_expand_and_toggle() {
     );
 }
 
-/// A freshly-constructed dashboard starts with the "Inactive". (roster-only) section collapsed by
-/// default — and no other section. Expanding it is one keypress away (and survives reopen within
-/// the process; see `collapsed_sections` docs).
+/// A freshly-constructed dashboard starts with every section expanded: 刚结束的会话按更新时间
+/// 排在 Idle 节最前, 默认折叠会把它们藏掉. (Collapsed state is user-driven and survives reopen
+/// within the process; see `collapsed_sections` docs.)
 #[test]
-fn inactive_section_collapsed_by_default() {
+fn all_sections_expanded_by_default() {
     let state = DashboardState::new();
-    assert!(
-        state.is_section_collapsed(SectionKey::State(RowState::Inactive)),
-        "Inactive must start collapsed",
-    );
-    for other in [
+    for section in [
         RowState::NeedsInput,
         RowState::Working,
         RowState::Idle,
+        RowState::Inactive,
         RowState::Completed,
         RowState::Failed,
     ] {
         assert!(
-            !state.is_section_collapsed(SectionKey::State(other)),
-            "{other:?} must start expanded",
+            !state.is_section_collapsed(SectionKey::State(section)),
+            "{section:?} must start expanded",
         );
     }
     assert!(

@@ -1,3 +1,14 @@
+# 1.28.4 - 2026-10-10
+
+## Fixes
+
+- **Dashboard 会话列表按更新时间排序 (Idle 与 Inactive 合并一节)**: 此前 `RowState::group_priority` 把 Inactive (其他进程的结束/空闲会话) 整组压在 Idle 之下, 且 Inactive 节默认折叠, 别的终端刚结束的会话沉到列表底部 (视觉上像按创建时间排序). 现在 `Idle` 与 `Inactive` 同组优先级 (3), 组内统一按 `last_change_at` 倒序混排: 刚结束的会话浮到最前, 陈旧的空闲标签页按最后活跃时间沉底; 渲染层 `build_dashboard_lines` 分节键改用组优先级, 合并节组头/折叠键固定为 `Idle`; Inactive 节不再默认折叠; 顶栏 `idle` 芯片计数并入 Inactive 行. Awaiting/Working 仍置顶, Done/Failed 仍分组垫底.
+
+## Notes
+
+- 上游无新增提交 (SOURCE_REV 559751fd 不变), 本版为本地变更发版.
+- 产品版本 1.28.3 -> 1.28.4.
+
 # 1.28.3 - 2026-10-09
 
 ## Fixes

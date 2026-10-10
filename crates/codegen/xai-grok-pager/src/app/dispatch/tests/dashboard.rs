@@ -2125,7 +2125,8 @@ fn idle_roster_entry(session_id: &str, title: &str) -> crate::app::roster::Roste
     crate::app::roster::RosterEntry {
         session_id: session_id.to_string(),
         title: Some(title.to_string()),
-        cwd: "/repo".to_string(),
+        // 与 test_app 的 cwd 一致: RosterLoaded/DashboardSessionsLoaded 装载按当前目录收口, 不匹配的行会被丢弃
+        cwd: "/tmp".to_string(),
         is_worktree: false,
         session_kind: None,
         model_id: None,
@@ -8248,7 +8249,7 @@ fn dashboard_attach_build_roster_row_keeps_disk_resume() {
                 session_cwd: Some(cwd),
                 chat_kind: false,
                 ..
-            }] if session_id == "build-dash-1" && cwd == std::path::Path::new("/repo")
+            }] if session_id == "build-dash-1" && cwd == std::path::Path::new("/tmp")
         ),
         "expected Build disk resume with roster cwd, got {effects:?}"
     );

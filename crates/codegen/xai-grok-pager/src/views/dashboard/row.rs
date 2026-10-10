@@ -1838,26 +1838,24 @@ mod tests {
             assert_eq!(nth(&rows, 0).state, expected, "activity={activity:?}");
         }
     }
-    /// In state grouping, `Inactive` sorts below `Idle`: not loaded here, so less immediately actionable.
-    /// It sorts above `Done` / `Failed`: still live, resumable sessions.
+    /// In state grouping, `Idle` and `Inactive` share one band ordered by last change:
+    /// a session another pager just finished floats above this pager's stale idle tabs.
+    /// `Done` still sorts below the band regardless of its newer timestamp.
     #[test]
-    fn sort_rows_places_inactive_between_idle_and_done() {
-        let mut rows = vec![
-            make_row("done", RowState::Completed),
-            make_row("inactive", RowState::Inactive),
-            make_row("idle", RowState::Idle),
-            make_row("failed", RowState::Failed),
-        ];
+    fn sort_rows_merges_idle_and_inactive_by_last_change() {
+        let now = SystemTime::now();
+        let mut stale_idle = make_row("idle", RowState::Idle);
+        stale_idle.last_change_at = now - Duration::from_secs(3_600);
+        let mut fresh_inactive = make_row("inactive", RowState::Inactive);
+        fresh_inactive.last_change_at = now - Duration::from_secs(60);
+        let mut done = make_row("done", RowState::Completed);
+        done.last_change_at = now;
+        let mut rows = vec![done, fresh_inactive, stale_idle];
         sort_rows(&mut rows, super::super::state::Grouping::State, &[]);
         let order: Vec<RowState> = rows.iter().map(|r| r.state).collect();
         assert_eq!(
             order,
-            vec![
-                RowState::Idle,
-                RowState::Inactive,
-                RowState::Completed,
-                RowState::Failed,
-            ],
+            vec![RowState::Inactive, RowState::Idle, RowState::Completed]
         );
     }
     #[test]

@@ -146,8 +146,8 @@ pub enum RowState {
     /// Alive, idle.
     Idle,
     /// A roster-only session: idle / dormant in another pager process and never loaded in this one.
-    /// Local agents never classify as `Inactive` (see `classify_top_level`); only `roster_activity_to_state` produces it, so the "Idle" section
-    /// stays focused on sessions you're actively cycling between.
+    /// Local agents never classify as `Inactive` (see `classify_top_level`); only `roster_activity_to_state` produces it.
+    /// Renders in the same section as `Idle` (equal `group_priority`), ordered together by last change.
     Inactive,
     /// Finished, with status == "completed".
     Completed,
@@ -166,14 +166,12 @@ impl RowState {
 
     /// Sort priority used inside a state group: higher = floats up.
     /// Pinned rows always float to the absolute top regardless of state.
+    /// Idle 与 Inactive 同组: 会话列表按更新时间排序, 别的进程刚结束的会话要浮在自己陈旧的空闲标签页之上.
     pub fn group_priority(self) -> u8 {
         match self {
             Self::NeedsInput => 6,
             Self::Working => 5,
-            Self::Idle => 3,
-            // Below Idle (these aren't loaded here, so they're less immediately
-            // actionable) but above Done/Failed (they're still live, resumable sessions)
-            Self::Inactive => 2,
+            Self::Idle | Self::Inactive => 3,
             Self::Completed => 1,
             Self::Failed => 0,
         }
@@ -1124,10 +1122,8 @@ impl DashboardState {
             hovered_row: None,
             selected_section: None,
             hovered_section: None,
-            // The "Inactive" section (roster-only idle/dormant sessions owned by OTHER pager processes; see
-            // `RowState::Inactive`) is background noise relative to the sessions you're actively cycling
-            // between.
-            collapsed_sections: std::iter::once(SectionKey::State(RowState::Inactive)).collect(),
+            // Idle 与 Inactive 合并为一节且默认展开: 刚结束的会话按更新时间排在最前, 不再默认折叠进 Inactive.
+            collapsed_sections: std::collections::HashSet::new(),
             selected_idle_overflow: false,
             hovered_idle_overflow: false,
             idle_show_all: false,

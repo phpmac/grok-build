@@ -48,8 +48,8 @@ pub(super) fn render_header(
         match r.state {
             RowState::NeedsInput => awaiting += 1,
             RowState::Working => working += 1,
-            RowState::Idle => idle += 1,
-            RowState::Inactive => {}
+            // Idle 与 Inactive 同节渲染, 芯片计数保持一致
+            RowState::Idle | RowState::Inactive => idle += 1,
             RowState::Completed => done += 1,
             RowState::Failed => failed += 1,
         }

@@ -623,9 +623,10 @@ fn render_header_suppresses_zero_count_chips() {
         );
     }
 }
-/// Inactive (roster-only) rows get no header chip; only the section header carries their count.
+/// Inactive (roster-only) rows count into the `idle` chip since the Idle/Inactive sections merged;
+/// there is still no separate `inactive` chip.
 #[test]
-fn render_header_has_no_inactive_chip() {
+fn render_header_counts_inactive_into_idle_chip() {
     let theme = Theme::current();
     let mut buf = Buffer::empty(Rect::new(0, 0, 120, 1));
     let mut state = DashboardState::new();
@@ -636,8 +637,8 @@ fn render_header_has_no_inactive_chip() {
     render_header_only(&mut buf, Rect::new(0, 0, 120, 1), &theme, &rows, &mut state);
     let content = buf_to_text(&buf);
     assert!(
-        content.contains("1 idle"),
-        "idle chip must still render, got: {content:?}"
+        content.contains("2 idle"),
+        "idle chip must count Idle and Inactive rows, got: {content:?}"
     );
     assert!(
         !content.contains("inactive"),
