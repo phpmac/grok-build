@@ -1,3 +1,14 @@
+# 1.28.5 - 2026-10-14
+
+## Changed
+
+- **提示词合并上游沟通新规**: `<plain_speech>` 并入上游 `<communication>` 中与本地风格不冲突的两条: 肯定式表达 (先说事实或该做什么, 禁 "X, not Y" 式对照框架与"不做什么"的垫话); 禁套话短语 (delve / foster / leverage / it's worth noting / Bottom Line: 等). 上游 `<communication>` 整段与放宽的 user_guide 按设计表继续不取, 本地段落全保留.
+
+## Notes
+
+- 上游无新增提交 (SOURCE_REV 559751fd 不变, tip 2bdd1d6a 已在本地), 本版为本地变更发版.
+- 产品版本 1.28.4 -> 1.28.5.
+
 # 1.28.4 - 2026-10-10
 
 ## Fixes
