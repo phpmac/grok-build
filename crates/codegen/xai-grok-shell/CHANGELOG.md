@@ -1,3 +1,15 @@
+# 1.28.6 - 2026-10-14
+
+## Changed
+
+- **提示词切换为官方上游为准**: `templates/prompt.md` 与 `templates/subagent_prompt.md` 整体取 `upstream/main` 版本; 本地增补段落 (plain_speech / output_efficiency / workspace_scope / source_citation / hooks_compliance / mindset 等) 与 1.28.5 并入的两条沟通新规一并移除, 上游 `<communication>` 风格段随官方版生效. 明文 `include_str!` 加载机制不变.
+- 回复语言指令随官方模板移除: 上游模板无 `<language>` 段, `[ui].language` 不再写入系统提示词; 会话标题 / commit 文案等其他 language 消费点不变.
+
+## Notes
+
+- 上游无新增提交 (SOURCE_REV 559751fd 不变), 本版为本地变更发版.
+- 产品版本 1.28.5 -> 1.28.6.
+
 # 1.28.5 - 2026-10-14
 
 ## Changed
